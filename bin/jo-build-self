@@ -1,0 +1,64 @@
+#!/bin/sh
+set -e
+
+pushd "$(dirname "$0")" >/dev/null
+JOBINDIR=$(pwd)
+JOLIBDIR=$JOBINDIR/.jo
+JOROOT=$(dirname "$JOBINDIR")
+popd >/dev/null
+
+export NODE_PATH="${JOROOT}/jo/node_modules"
+
+if [ "$1" == "--force" ]; then
+  rm -rf "$JOLIBDIR"
+  mkdir -p "$JOLIBDIR"
+elif [ "$1" == "--help" ] || [ "$1" == "-h" ]; then
+  echo "Usage: $0 [--force]" >&2
+  exit 0
+else
+  mkdir -p "$JOLIBDIR/visitors"
+fi
+
+# Really messy paths here: only way to make sourcemap paths work properly with babel & node
+
+pushd "${JOROOT}" >/dev/null
+mkdir -p "$JOLIBDIR/.build"
+for pkg in . util visitors remotectrl asyncfs; do
+  dstf=$JOLIBDIR/$pkg/index.js
+  mkdir -p "$JOLIBDIR/$pkg"
+
+  for srcf in "jo/$pkg"/*.js; do
+    # echo "check mtime $srcf"
+    if [ "$srcf" -nt "$dstf" ]; then
+      pushd "$JOLIBDIR/.build" >/dev/null
+      out=$JOLIBDIR/$pkg/index.js
+      echo "$0: building $pkg"
+      # echo "pwd: '$(pwd)'"
+      # echo "in:  '../../../jo/$pkg/*.js'"
+      # echo "out: '$out'"
+      "${NODE_PATH}/babel/bin/babel/index.js" \
+        --source-maps \
+        --modules common \
+        --experimental \
+        --optional es6.symbols,runtime \
+        --out-file "$out" \
+        "../../../jo/$pkg"/*.js
+        # --compact true
+
+      if [ "$pkg" == "." ]; then
+        tmpout=$JOLIBDIR/$pkg/.tmp.index.js
+        mv "$out" "$tmpout"
+        echo "//# sourceMappingURL=index.js.map" > "$out"
+        echo "require('source-map-support').install();" >> "$out"
+        cat "$tmpout" >> "$out"
+        echo '' >> "$out"  # make sure there's a line break at the end
+        echo "main(process.argv);" >> "$out"
+        rm "$tmpout"
+      fi
+
+      popd >/dev/null
+      break
+    fi
+  done
+done
+popd >/dev/null

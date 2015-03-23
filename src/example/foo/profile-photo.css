@@ -1,0 +1,18 @@
+var ProfilePhoto = React.createClass({
+  render: function() {
+    var cx = React.addons.classSet;
+    var classes = cx({
+      'ui-profile': true,
+      'ui-profile-active': this.props.active,
+      'ui-profile-inactive': !this.props.active
+    });
+
+    var styles = {backgroundImage: 'url('+this.props.pic+')'}
+    return (
+      <div className={classes}>
+        <div className='ui-profile-photo' style={styles} />
+        <div className='ui-profile-bar' />
+      </div>
+    );
+  }
+});

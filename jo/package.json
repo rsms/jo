@@ -1,0 +1,12 @@
+{
+  "name": "pkgbuild",
+  "version": "0.0.0",
+  "dependencies": {
+    "async": "^0.9.0",
+    "babel": "^4.7.16",
+    "babel-runtime": "^4.7.16",
+    "fs-extra": "^0.16.4",
+    "recast": "^0.10.9",
+    "source-map-support": "^0.2.10"
+  }
+}
