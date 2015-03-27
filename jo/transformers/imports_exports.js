@@ -54,7 +54,7 @@ export var ImportExportVisitor = {
       // e.g. `import "foo"` (no identifier)
       imp.moduleID = JSIdentifier.fromString(imp.ref);
       if (!imp.moduleID || !JSIdentifier.isValid(imp.moduleID)) {
-        throw ExportError(this.file, node.source, 'failed to infer module identifier');
+        throw ImportError(this.file, node.source, 'failed to infer module identifier');
       }
       imp.moduleID = B.identifier(imp.moduleID);
     } else {

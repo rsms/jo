@@ -39,10 +39,10 @@ export function SrcLocation(props) {
       filename:    {value: filename, enumerable:true},
       code:        {value: file ? file.code : null, enumerable:true},
       range:       {value: Array.isArray(node.range) ? node.range : [0,0], enumerable:true},
-      startLine:   {value: node.loc.start.line, enumerable:true},
-      startColumn: {value: node.loc.start.column, enumerable:true},
-      endLine:     {value: node.loc.end.line, enumerable:true},
-      endColumn:   {value: node.loc.end.column, enumerable:true},
+      startLine:   {value: node.loc ? node.loc.start.line : undefined, enumerable:true},
+      startColumn: {value: node.loc ? node.loc.start.column : undefined, enumerable:true},
+      endLine:     {value: node.loc ? node.loc.end.line : undefined, enumerable:true},
+      endColumn:   {value: node.loc ? node.loc.end.column : undefined, enumerable:true},
     });
   } else {
     return Object.create(SrcLocation.prototype, {

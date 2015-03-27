@@ -9,6 +9,7 @@ export function SrcError(name, srcloc, message, fixSuggestion, related) {
   // this.stack = (new Error()).stack;
   this.name          = name;
   this.message       = message;
+  this._message      = message;
   this.srcloc        = srcloc;
   this.fixSuggestion = fixSuggestion;
   this.related       = related;
@@ -46,7 +47,7 @@ SrcError.formatSource = function(srcloc, message, errname, caretColor, linesB, l
   if (errname) {
     msg += ' ' + S.grey('('+errname+')');
   }
-  if (srcloc.code) {
+  if (srcloc.code && srcloc.startLine !== undefined) {
     msg += '\n' + indent + srcloc.format(caretColor, linesB, linesA).join('\n'+indent);
   }
   return msg;
@@ -64,7 +65,14 @@ SrcError.format = function(err, linesB, linesA) {
     endColumn:   err.column-1,
   });
 
-  var message = SrcError.formatSource(srcloc, err.message, err.name, 'red', linesB, linesA);
+  var message = SrcError.formatSource(
+    srcloc,
+    err._message || err.message,
+    err.name,
+    'red',
+    linesB,
+    linesA
+  );
 
   if (err.fixSuggestion) {
     var S = TermStyle.stdout;

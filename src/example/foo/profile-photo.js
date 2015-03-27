@@ -3,17 +3,17 @@ import React, {Component as ReactComponent} from 'react'
 var Foo;
 export var boo;
 
-export default {a,b};
+// export default {a,b};
 
-interface Animal<T> {
-  name:string;
-  foo:T;
-  hello(times:T):string;
-}
-interface Person {
-  name:string;
-  age:int;
-}
+// interface Animal<T> {
+//   name:string;
+//   foo:T;
+//   hello(times:T):string;
+// }
+// interface Person {
+//   name:string;
+//   age:int;
+// }
 
 var a, b = 1;
 let c = 2;

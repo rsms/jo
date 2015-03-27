@@ -1,11 +1,11 @@
-// interface IRModule {
+// interface Module {
 //   file?string
 //   stat?:fs.Stat
 //   code?:string
 //   map?:SourceMap
 // }
 
-class IRModule {
+class Module {
   constructor({file=null, stat=null, code=null, map=null}) {
     this.file = file
     this.stat = stat
@@ -26,8 +26,8 @@ class IRModule {
       try {
         m.map = JSON.parse(await fs.readFile(m.file + '.map', {encoding:'utf8'}))
       } catch (err) {
-        // Ignore non-existent source maps for precompiled IRModules
-        if (!(m instanceof PrecompiledIRModule) || err.code !== 'ENOENT') {
+        // Ignore non-existent source maps for precompiled Modules
+        if (!(m instanceof PrecompiledModule) || err.code !== 'ENOENT') {
           throw err
         }
       }
@@ -37,7 +37,7 @@ class IRModule {
 }
 
 
-class PrecompiledIRModule extends IRModule {
+class PrecompiledModule extends Module {
   constructor(file) {
     super({file:file})
   }

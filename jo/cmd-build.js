@@ -63,18 +63,21 @@ main: async function(opts, args, usage, cb) {
     throw '-o can not be specified when building multiple packages'
   }
 
-  let target = Target.fromID(
-    opts.target || TARGET_NODEJS,
-    opts.dev ? TARGET_MODE_DEV : TARGET_MODE_RELEASE
-  )
-
   // Setup logging
   let logger = new Logger(opts.D ? Logger.DEBUG : opts.v ? Logger.INFO : Logger.WARN)
+
+  // Target
+  let target = Target.create({
+    id:     opts.target || TARGET_NODEJS,
+    mode:   opts.dev ? TARGET_MODE_DEV : TARGET_MODE_RELEASE,
+    logger: logger,
+    output: opts.o,
+  })
 
   // Build packages
   let buildCtx = new BuildCtx(target, logger)
   await Promise.all(pkgs.map(pkg => buildCtx.buildPkg(pkg)))
 
   // Make product(s)
-  await target.make(pkgs, logger, opts.o)
+  // await target.make(pkgs, logger, opts.o)
 }}

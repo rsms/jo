@@ -1,24 +1,31 @@
 
 class NodeJSTarget extends Target {
+  constructor() {
+    super();
+    this.registerGlobals([
+      'global',
+      'process',
+      'console',
+      'Buffer',
+      'require',
+      'exports',
+      '__filename',
+      '__dirname',
+      'setTimeout',
+      'clearTimeout',
+      'setInterval',
+      'clearInterval'
+    ]);
+  }
+
   get moduleType() {
     return 'common'
   }
 
-  get transforms() {
-    return super.transforms.concat([
-      'runtime', // indicate that generated code should use babel-runtime instead of inlines
+  transforms(transforms) {
+    return super.transforms(transforms).concat([
       'asyncToGenerator',  // async/await. Requires Node.js >0.11.2
     ])
-  }
-
-  get disabledTransforms() {
-    var t = super.disabledTransforms
-    // Make sure "es6.modules" are not disabled, as we need it for "runtime"
-    var i = t.indexOf('es6.modules')
-    if (i !== -1) {
-      t.splice(i,1)
-    }
-    return t
   }
 
 

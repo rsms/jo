@@ -4,7 +4,7 @@ class Pkg {
   // jopath?:string;  // e.g. "/jo"
   // files:string;
   // imports:{};      // e.g. {pkgref: [Import], ...}
-  // exports:{};      // e.g. {identifier: Export, ...}
+  // exports:{};      // e.g. {identifier: Export|null, ...}
   // module?:IRModule  // a compiled module
   // deps:Pkg[]       // packages this package depends on
 
@@ -21,15 +21,6 @@ class Pkg {
 
   get id() { 
     return this.ref || this.dir
-  }
-
-  // makePkgInfo():PkgInfo
-  makePkgInfo() {
-    // E.g. `{imports:["foo","foo/bar"],files:["a.js","b.js"]}`
-    return {
-      imports: Object.keys(this.imports),
-      files: this.files,
-    };
   }
 
   // parsePkgInfo(code:string):PkgInfo
@@ -135,14 +126,12 @@ class Pkg {
       } catch (e) { importError = e; }
     }
 
-    if (importError || files.length === 0) {
-      if (files.length === 0) {
-        throw SrcError('PkgError', null, `no source files found in package "${pkg.id}"`, null, [
-          {message:'imported here', srcloc:importedAt}
-        ])
-      } else {
-        throw SrcError('ImportError', importedAt, importError.message)
-      }
+    if (!importError && files.length === 0) {
+      throw SrcError('PkgError', null, `no source files found in package "${pkg.id}"`, null, [
+        {message:'imported here', srcloc:importedAt}
+      ]);
+    } else if (importError) {
+      throw SrcError('ImportError', importedAt, importError.message);
     }
 
     return pkg

@@ -13,23 +13,35 @@ var Targets = {}
 // }
 
 class Target {
-  static fromID(id, mode) {
+  static create({id, mode, logger, output}) {
     switch (mode) {
       case undefined: case null: mode = TARGET_MODE_RELEASE; break;
       case TARGET_MODE_RELEASE: case TARGET_MODE_DEV: break;
       default: throw new Error(`unknown target mode "${mode}"`)
     }
+    var t;
     switch (id.toLowerCase()) {
-      case TARGET_BROWSER:                    return new BrowserTarget(TARGET_BROWSER, mode)
-      case TARGET_BROWSER_WEBKIT || 'webkit': return new WebkitTarget(TARGET_BROWSER_WEBKIT, mode)
-      case TARGET_NODEJS:                     return new NodeJSTarget(TARGET_NODEJS, mode)
+      case TARGET_BROWSER:                    t = new BrowserTarget;break;
+      case TARGET_BROWSER_WEBKIT || 'webkit': t = new WebkitTarget; break;
+      case TARGET_NODEJS:                     t = new NodeJSTarget; break;
       default: throw new Error(`unknown target identifier "${id}"`)
     }
+    t.id = id;
+    t.mode = mode;
+    t.logger = logger;
+    t.output = output;
+    return t;
   }
 
-  constructor(id, mode) {
-    this.id = id
-    this.mode = mode
+  constructor() {
+    this.globals = {'this':1, 'undefined':1};
+    this.undefinedReferenceIsError = false;
+  }
+
+  registerGlobals(globals) {
+    globals.forEach(id => {
+      this.globals[id] = true;
+    });
   }
 
   // targetForDependency:Target
@@ -41,11 +53,30 @@ class Target {
     return 'ignore';  // common|ignore|system|umd
   }
 
-  get transforms() {
-    var transforms = [
-      'utility.inlineEnvironmentVariables',  // process.env.FOO -> "value"
-    ];
 
+  moduleFilename(pkg:Pkg, depLevel:int) {
+    // return null to indicate that the module should not be stored.
+    if (this.output && depLevel === 0) {
+      // Assume whatever set "output" made sure there's only one top-level
+      // package. Now, return "output" for that top-level package `pkg`.
+      return this.output;
+    }
+    let t = this.id + '.' + this.mode
+    if (pkg.jopath && pkg.ref) {
+      return pkg.jopath + '/pkg/' + t + '/' + pkg.ref + '/index.js'
+    }
+    return WorkDir.path + '/' +
+      ( pkg.ref ? 'pkg/' + t + '/' + pkg.ref :
+                  'pkgdir/' + t + pkg.dir ) + '.js'
+  }
+
+
+  precompiledModuleFilename(pkg:Pkg, depLevel:int) {
+    return this.moduleFilename(pkg, depLevel);
+  }
+
+
+  transforms(transforms) {
     // Transforms based on "debug" or "release" build settings:
     if (this.mode === TARGET_MODE_RELEASE) {
       transforms = transforms.concat([
@@ -70,11 +101,12 @@ class Target {
       ]);
     }
 
-    return transforms;
+    return transforms
   }
 
-  get disabledTransforms() {
-    return ['es6.modules']
+
+  disabledTransforms(disabledTransforms) {
+    return disabledTransforms
   }
 
 
@@ -90,7 +122,7 @@ class Target {
     // Note: Can't "import" babel, as babel's interopRequire does weird things
     var product = require('babel').transform(code, {
       filename:          filename,
-      // inputSourceMap:    map,
+      inputSourceMap:    map,
       sourceMap:         true,     // generate SourceMap
       sourceMapName:     'out.map',
       sourceRoot:        map.sourceRoot,

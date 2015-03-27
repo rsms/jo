@@ -1,5 +1,5 @@
 
-// interface IRModule {
+// interface Module {
 //   file?string
 //   code?:string
 //   map?:SourceMap
@@ -76,12 +76,18 @@ class BuildCtx {
       this.logInfo('using precompiled package', this.log.style.boldGreen(pkg.id))
 
       // This is a precompiled package
-      pkg.module = new PrecompiledIRModule(
-        pkg.dir + '/' + PrecompiledIRModule.sourceFileForTarget(pkg.files, this.target)
+      pkg.module = new PrecompiledModule(
+        pkg.dir + '/' + PrecompiledModule.sourceFileForTarget(pkg.files, this.target)
       );
 
       // TODO: register any dependencies for this precompiled package,
       // and populate outdatedDeps with outdated deps.
+
+      // Copy module
+      let targetFilename = this.target.precompiledModuleFilename(pkg, this.depth);
+      if (targetFilename && targetFilename !== pkg.module.file) {
+        pkg.module.copyToIfOutdated(targetFilename);
+      }
 
     } else {
       this.logInfo('building source package', this.log.style.boldGreen(pkg.id))
@@ -90,8 +96,8 @@ class BuildCtx {
       // Load source files
       var srcfiles = await pkg.loadSrcFiles();
 
-      // build IR module
-      pkg.module = await this.buildIRModule(pkg, srcfiles);
+      // build module
+      pkg.module = await this.buildModule(pkg, srcfiles);
     }
 
     // Resolve any dependencies and register with pkg
@@ -104,6 +110,12 @@ class BuildCtx {
       // for (let depPkg of outdatedDeps) { await ctx.buildPkg(depPkg) }
       await Promise.all(outdatedDeps.map(pkg => ctx.buildPkg(pkg)))
     }
+
+    // Check imported names
+    // TODO:
+    //   for imp in pkg:
+    //     for name in imp:
+    //       assert (name in pkg.deps[imp.ref].pkginfo.exported)
   }
 
 
@@ -119,7 +131,7 @@ class BuildCtx {
       if (!depPkg) {
         let importedAt, srcloc = null
         if ((importedAt = pkg.imports[pkgref]) && importedAt.length !== 0) {
-          srcloc = SrcLocation(importedAt[0].node, importedAt[0].file)
+          srcloc = SrcLocation(importedAt.nodes[0], importedAt.nodes[0].srcfile)
         }
         depPkg = await pkg.pkgFromRef(pkgref, srcloc)
         let builtPkg = this.getBuiltPkg(depPkg.dir)
@@ -135,75 +147,74 @@ class BuildCtx {
   }
 
 
-  // buildIRModule(pkg:Pkg, irModuleFile:string, srcfiles:SrcFile[]):IRModule
-  async buildIRModule(pkg, srcfiles) {
-    let irmod = new IRModule({ file: pkg.irModuleFile() })
+  // buildModule(pkg:Pkg, irModuleFile:string, srcfiles:SrcFile[]):Module
+  async buildModule(pkg, srcfiles) {
+    let mod = new Module({ file: this.target.moduleFilename(pkg, this.depth) });
 
-    // Is the IR module outdated?
-    if (!irmod.file || await this.isIRModuleOutdated(pkg, irmod, srcfiles)) {
-      this.logDebug('compiling irmodule for pkg', this.log.style.boldGreen(pkg.id))
+    // Is the module outdated?
+    if (!mod.file || await this.isModuleOutdated(pkg, mod, srcfiles)) {
+      this.logDebug('compiling module for pkg', this.log.style.boldGreen(pkg.id))
 
-      // Compile package to IR module
-      var compiler = new PkgCompiler(pkg)
-      var irmod2 = await compiler.compile(srcfiles)
-      irmod.code = irmod2.code
-      irmod.map = irmod2.map
+      // Compile package to module
+      var compiler = new PkgCompiler(pkg, this.target)
+      var compiled = await compiler.compile(srcfiles)
+      mod.code = compiled.code
+      mod.map = compiled.map
 
       // Write intermediate code
-      if (irmod.file) {
+      if (mod.file) {
         this.logDebug(
-          'write IR module', this.log.style.boldMagenta(irmod.file),
+          'write module', this.log.style.boldMagenta(mod.file),
           'for package', this.log.style.boldGreen(pkg.id)
         )
-
-        await WriteCode(irmod.code, irmod.map, irmod.file)
+        await WriteCode(mod.code, mod.map, mod.file)
       }
 
-      // Clear stat (which might relate to old irmodule code)
-      irmod.stat = null
+      // Clear stat (which might relate to old module code)
+      mod.stat = null
     } else {
-      this.logDebug('reusing up-to-date IR module for pkg', this.log.style.boldGreen(pkg.id))
+      this.logDebug('reusing up-to-date module for pkg', this.log.style.boldGreen(pkg.id))
     }
 
-    return irmod
+    return mod
   }
 
 
-  async isIRModuleOutdated(pkg, irmod, srcfiles) {
+  async isModuleOutdated(pkg, mod, srcfiles) {
     // Note: file might be null if this is an intermediate dependency that for some
     // reason does not have a well-known "pkg" location.
-    irmod.stat = await fs.stat(irmod.file)
+    mod.stat = await fs.stat(mod.file)
     var pkgid = this.log.style.boldGreen(pkg.id)
-    if (!irmod.stat) {
+    if (!mod.stat) {
       // There's no module file
       return true
-    } else if (srcfiles.some(sf => sf.st.mtime > irmod.stat.mtime)) {
+    } else if (srcfiles.some(sf => sf.st.mtime > mod.stat.mtime)) {
       // some source file has changed since the module was built.
-      this.logDebug('IR module is outdated (source files changed) for pkg', pkgid)
+      this.logDebug('module is outdated (source files changed) for pkg', pkgid)
       return true
     }
 
     // Load code so that we get access to pkg.imports
-    await irmod.load()
+    await mod.load()
     var pkginfo
     try {
-      pkginfo = Pkg.parsePkgInfo(irmod.code)
+      pkginfo = Pkg.parsePkgInfo(mod.code)
     } catch (err) {
-      this.logWarn('error while loading IR module code:', err.message)
+      this.logWarn('error while loading module code:', err.message)
       return true
     }
 
-    // Was there a different set of files used to build irmod?
+    // Was there a different set of files used to build mod?
     var files = pkg.files.slice()
     if (files.length !== pkginfo.files.length) {
-      this.logDebug('IR module is outdated (number of source files differ) for pkg', pkgid)
+      this.logDebug('module is outdated (number of source files differ) for pkg', pkgid)
       return true
     }
     files.sort()
     pkginfo.files.sort()
     for (let i = 0, L = files.length; i !== L; ++i) {
       if (files[i] !== pkginfo.files[i]) {
-        this.logDebug('IR module is outdated (source files differ) for pkg', pkgid)
+        this.logDebug('module is outdated (source files differ) for pkg', pkgid)
         return true
       }
     }

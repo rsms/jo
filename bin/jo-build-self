@@ -23,7 +23,7 @@ fi
 
 pushd "${JOROOT}" >/dev/null
 mkdir -p "$JOLIBDIR/.build"
-for pkg in . util visitors remotectrl asyncfs; do
+for pkg in . util transformers remotectrl asyncfs; do
   dstf=$JOLIBDIR/$pkg/index.js
   mkdir -p "$JOLIBDIR/$pkg"
 

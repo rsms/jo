@@ -1,26 +1,24 @@
 "use strict";
-var fsx = require('fs-extra');
-var path = require('path');
 var recast = require('recast');
 var B = recast.types.builders;
-var inspect = require('util').inspect;
-// var SrcError = require('./srcerror');
 
-// var ImportExportVisitor = require('./visitors/imports_exports');
-// var ReturnVisitor = require('./visitors/return');
-// var TypesVisitor = require('./visitors/types');
-// var ScopeVisitor = require('./visitors/scope');
-// var __DEV__Visitor = require('./visitors/__dev__');
+import {JSIdentifier, SrcError, SrcLocation, repr} from './util'
 
-import {
-  ImportExportVisitor,
-  ReturnVisitor,
-  TypesVisitor,
-  ScopeVisitor,
-  __DEV__Visitor
-} from './visitors'
+import * as babel from 'babel'
+import BabelFile from 'babel/lib/babel/transformation/file';
+import Transformer from 'babel/lib/babel/transformation/transformer'
+import { ModuleTransformer, FileLocalVarsTransformer } from './transformers'
 
-import {JSIdentifier, SrcError, SrcLocation} from './util'
+// Register jo transformers (wish there was a non-mutating API for this)
+babel.transform.transformers['jo.modules'] =
+  new Transformer('jo.modules', ModuleTransformer);
+babel.transform.transformers['jo.fileLocalVars'] =
+  new Transformer('jo.fileLocalVars', FileLocalVarsTransformer);
+
+function ExportError(file, node, message, fixSuggestion, related) {
+  return SrcError('ExportError', SrcLocation(node, file), message, fixSuggestion, related);
+}
+
 
 // interface SrcFile {
 //   dir:string       // e.g. "/abs/path/foo"
@@ -72,306 +70,252 @@ import {JSIdentifier, SrcError, SrcLocation} from './util'
 //   code:string
 // }
 
+// interface ParseResult {
+//   imports:ASTImportDeclaration[]
+//   code:string
+//   map:SourceMap
+// }
 
 class PkgCompiler {
 
-  // (pkg:Pkg)
-  constructor(pkg) {
+  // (pkg:Pkg, target:Target)
+  constructor(pkg, target) {
     this.pkg = pkg
+    this.target = target
+    this._nextAnonID = 0;
   }
 
-  // async compile(srcfiles:SrcFile[]):{code:string, map:SourceMap}
+  // async compile(srcfiles:SrcFile[]):CodeBuffer
   async compile(srcfiles) {
     // load code and ast for each source file of the package
-    await this.parseFiles(srcfiles)
+    var parsed = await this.parseFiles(srcfiles)
 
-    // free up memory (per-file code only needed for error reporting during transformation)
-    // srcfiles.forEach((file) => file.code = null)
+    // Code buffer
+    var codebuf = new CodeBuffer;
 
-    // console.log('———— imports: ————'); dumpPkgImports(this.pkg);
-    // console.log('———— exports: ————'); dumpPkgExports(this.pkg);
+    // Add header
+    // console.log('fileImports:', repr(imports))
+    this.genHeader(srcfiles, parsed, codebuf);
+    // console.log('genImportsHeader:', codebuf.code);
 
-    // join file ASTs
-    var ast = joinAST(srcfiles);
+    // Add source files
+    // TODO: sort by class hierarchy
+    for (let i = 0, L = parsed.length; i !== L; i++) {
+      let parseRes = parsed[i];
+      // let srcfile = srcfiles[i];
+      codebuf.addMappedCode(parseRes.code, parseRes.map);
+    }
 
-    // add imports to top of AST
-    addJSImports(this.pkg, ast);
-
-    // pkginfo
-    ast.program.body[0].comments = [
-      B.line('#jopkg' + JSON.stringify(this.pkg.makePkgInfo())),
-    ].concat(ast.program.body[0].comments || []);
-
-    // codegen
-    var result = recast.print(ast, {
-      sourceMapName: this.pkg.id + '.js',
-    });
-    // console.log(result.map);
-    // console.log(result.code);
-    // process.exit(0);
-    return result;
+    console.log(codebuf.code);
+    return codebuf;
   }
 
 
-  // async parseFiles(srcfiles:SrcFile[])
+  // (srcfiles:SrcFile[], parsed:ParseResult[], codebuf:CodeBuffer)
+  genHeader(srcfiles, parsed, codebuf) {
+    //  E.g.
+    //    var _$0 = require('pkg1'), _$1 = require('pkg2');
+    //    var file1$a = _$0, file1$b = _$0.B;
+    //    var file2$c = _$1.c;
+
+    // Contains a mapping from runtime helper ref => last import
+    var runtimeImps = {};
+
+    // Maps unique import refs to list of imports
+    var importRefs = {};
+
+    // Sort by unique refs, and separate runtime helpers
+    for (let i = 0, L = parsed.length; i !== L; ++i) {
+      let srcfile = srcfiles[i];
+      let imports = parsed[i].imports;
+      for (let imp of imports) {
+        if (imp.jo_isRuntimeHelper) {
+          runtimeImps[imp.source.value] = imp;
+        } else {
+          imp.srcfile = srcfile;
+          let impRefs = importRefs[imp.source.value];
+          if (impRefs) {
+            impRefs.push(imp);
+          } else {
+            importRefs[imp.source.value] = impRefs = [imp];
+          }
+        }
+      }
+    }
+
+
+    // Add pkginfo header
+    var runtimeRefPrefixLen = 'babel-runtime/'.length;
+    var pkginfo = {
+      files:   this.pkg.files,
+      imports: Object.keys(importRefs),
+      exports: Object.keys(this.pkg.exports),
+      'babel-runtime': Object.keys(runtimeImps).map(ref => {
+        return ref.substr(runtimeRefPrefixLen);
+      }),
+    };
+    codebuf.addLine('//#jopkg'+JSON.stringify(pkginfo));
+    codebuf.addLine('//#sourceMappingURL=index.js.map');
+
+    // Add imports
+    if (Object.keys(runtimeImps).length !== 0 || Object.keys(importRefs).length !== 0) {
+      // Add interop require
+      codebuf.addLine(
+        'var _$import = function(ref){ var m = require(ref); '+
+        'return m && m.__esModule ? m["default"] : m; }'
+      );
+
+      // Add runtime helpers
+      codebuf.addRuntimeImports(runtimeImps, Object.keys(importRefs).length===0);
+
+      // Add regular imports and assign {ref: [name, name ...]} to pkg.imports
+      this.pkg.imports = codebuf.addModuleImports(importRefs);
+      console.log('pkg.imports:', repr(this.pkg.imports,2));
+    }
+  }
+
+
+  // async parseFiles(srcfiles:SrcFile[]):ParseResult[]
   parseFiles(srcfiles) {
-    return Promise.all(srcfiles.map(async (file) => {
-      let source = await fs.readFile(file.dir + '/' + file.name, 'utf8')
-      file.code = source;
+    return Promise.all(srcfiles.map(async (srcfile, index) => {
+      srcfile.code = await fs.readFile(srcfile.dir + '/' + srcfile.name, 'utf8')
+      srcfile.id = srcfile.name.replace(/[^a-z0-9_]/g, '_')
       try {
-        file.ast = recast.parse(source, {sourceFileName: file.relpath, range: true })
-        this.transformJS(file)
-      } catch (e) {
-        err = e;
-        if (!err.file) err.file = file;
+        return this.parseFile(srcfile, /*isLastFile=*/index === srcfiles.length-1);
+        // srcfile.ast = recast.parse(source, {sourceFileName: srcfile.relpath, range: true })
+        // this.transformJS(srcfile)
+      } catch (err) {
+        if (!err.srcfile) err.file = srcfile;
+        throw err;
       }
     }))
   }
 
 
-  // transformJS(file:SrcFile)
-  transformJS(file) {
-    //console.log('--- transformJS', file.relpath, '---');
-    var astVisitor;
+  // parseFile(srcfile:SrcFile, isLastFile:bool):ParseResult
+  parseFile(srcfile, isLastFile) {
+    var bopts = {
+      filename:          srcfile.name,
+      sourceMap:         true,     // generate SourceMap
+      sourceMapName:     'out.map',
+      sourceRoot:        srcfile.dir,
+      code:              true,     // output JavaScript code
+      ast:               false,    // output AST
+      experimental:      true,     // enable things like ES7 features
+      compact:           this.target.mode === TARGET_MODE_RELEASE,   // "minify"
+      comments:          this.target.mode === TARGET_MODE_DEV,  // include comments in output
+      returnUsedHelpers: false,    // return information on what helpers are needed/was added
+      modules:           'ignore',
+      blacklist:         this.target.disabledTransforms(['es6.modules']),
+      optional:          this.target.transforms([
+        // Transformers suggested for the target
+        'jo.modules',
+        'runtime',
+        'utility.inlineEnvironmentVariables'
+      ]).concat([
+        // Required transformers
+        'jo.fileLocalVars',
+      ]),
+    };
 
-    // scope pass 1/2
-    astVisitor = {pkg: this.pkg, file: file};
-    for (let k in ScopeVisitor.declare) { astVisitor[k] = ScopeVisitor.declare[k]; }
-    recast.visit(file.ast, astVisitor);
+    var T = babel.types;
+    var bfile = new BabelFile(bopts);
+    bfile.jofile = srcfile;
+    bfile.joFileIDName = '_' + srcfile.id;
+    bfile.joFirstNonImportOffset = Infinity;
+    bfile.joImports = []; // ImportDeclaration[]
+    bfile.joIsLastFile = isLastFile;
+    bfile.joPkg = this.pkg;
+    bfile.joTarget = this.target;
 
-    // common
-    astVisitor = {pkg: this.pkg, file: file};
-    for (let k in commonVisitors) { astVisitor[k] = commonVisitors[k]; }
-    recast.visit(file.ast, astVisitor);
+    bfile.joAddImplicitImport = function(ref, specs, node=null) {
+      // Adds the equivalent of `import name from "ref"`
+      bfile.joImports.push({
+        jo_isImplicitImport:true,
+        source:{value:ref},
+        loc: node ? node.loc : null,
+        specifiers:Object.keys(specs).map(id => {
+          return {
+            id: {name:id},
+            name: {name:specs[id]},
+            srcfile: srcfile,
+            'default': id === 'default'
+          };
+        }),
+      });
+    }
+
+    bfile.joRegisterExport = function(name, node, isImplicitExport=false) {
+      var errmsg, existingExport = bfile.joPkg.exports[name];
+      if (existingExport) {
+        errmsg = (name === 'default') ?
+          'duplicate default export in package' :
+          'duplicate exported symbol in package';
+        throw ExportError(bfile.jofile, node, errmsg, null, [
+          { message: 'also exported here',
+            srcloc:  SrcLocation(existingExport.node, existingExport.file) }
+        ])
+      }
+      if (name === 'default') {
+        let prevExports = [], prevExportsLimit = 3;
+        Object.keys(bfile.joPkg.exports).forEach(k => {
+          var exp = bfile.joPkg.exports[k];
+          if (!exp.isImplicit && prevExports.length < prevExportsLimit) {
+            prevExports.push({
+              message: 'specific export here',
+              srcloc:  SrcLocation(exp.node, exp.file)
+            });
+          }
+        })
+        if (prevExports.length) {
+          // case: "export default" after explicit "export x"
+          throw ExportError(
+            bfile.jofile,
+            node,
+            'default export mixed with specific export',
+            null,
+            prevExports
+          );
+        }
+        // Overwrite any implicit exports
+        bfile.joPkg.exports = {};
+      } else {
+        let defaultExp = bfile.joPkg.exports['default'];
+        if (defaultExp) {
+          if (isImplicitExport) {
+            return; // simply ignore
+          }
+          throw ExportError(
+            bfile.jofile,
+            node,
+            'specific export mixed with default export',
+            null, [{
+              message: 'default export here',
+              srcloc:  SrcLocation(defaultExp.node, defaultExp.file)
+            }]
+          )
+        }
+      }
+      bfile.joPkg.exports[name] = {file:bfile.jofile, node:node, isImplicit:isImplicitExport};
+    };
+
+    bfile.joRemappedIdentifiers = {};
+    bfile.joLocalizeIdentifier = function (name) {
+      // takes an identifier and registers it as "local" for this file, effectively
+      // prefixing the id with that of the source file name.
+      var newID = T.identifier(bfile.joFileIDName + '$' + name);
+      this.joRemappedIdentifiers[name] = newID.name;
+      return newID;
+    };
+
+    var res = bfile.parse(srcfile.code);
+    res.imports = bfile.joImports;
+    // console.log('babel.transform:', res.code)
+    // console.log('bfile.joImports:', bfile.joImports)
+
+    return /*ParseResult*/res;
   }
 
+
 }
 
-
-// joinAST(srcfiles:SrcFile[]):AST
-function joinAST(srcfiles) {
-  var ast;
-  srcfiles.forEach((file) => {
-    if (!ast) {
-      ast = file.ast;
-    } else {
-      file.ast.program.body.forEach((n) => {
-        if (n) ast.program.body.push(n)
-      })
-    }
-  });
-  return ast;
-}
-
-
-function dumpPkgImports(pkg) {
-  // console.log('pkg.imports:', inspect(pkg.imports, {depth:3}));
-  Object.keys(pkg.imports).forEach(function (pkgref) {
-    console.log(pkgref + ' required at:');
-    var imps = pkg.imports[pkgref];
-    imps.forEach(function(imp) {
-      var loc = imp.node.loc.start;
-      console.log('  '+imp.file.name+':'+loc.line+':'+loc.column+
-                  (imp.moduleID ? ' as '+imp.moduleID.name : ''));
-      imp.members.forEach(function(member) {
-        if (member.srcID.name !== member.asID.name) {
-          console.log('    • '+member.srcID.name+' as '+member.asID.name);
-        } else {
-          console.log('    • '+member.srcID.name);
-        }
-      });
-    });
-  });
-}
-
-function dumpPkgExports(pkg) {
-  // console.log('pkg.exports:', inspect(pkg.exports, {depth:3}));
-  Object.keys(pkg.exports).forEach(function(id) {
-    var exp = pkg.exports[id];
-    var loc = exp.node.loc.start;
-    console.log(id+' exported from '+exp.file.name+':'+loc.line+':'+loc.column);
-  })
-}
-
-
-// Imports in a nutshell:
-//
-// Form 1:
-//  L(import S from P)
-//     _                          _                            _
-//  at Location there needs to be Symbol which is an alias for Package
-//
-// Form 2:
-//  L(import {S+} from P)
-//     _                          _                                         _             _
-//  at Location there needs to be Symbol(s+) which is an alias for exported Symbol(s+) in Package
-//
-
-// addJSImports(pkg:Pkg, ast:AST)
-function addJSImports(pkg, ast) {
-  // for each imported package:
-  Object.keys(pkg.imports).forEach(function (pkgref) {
-    var imps = pkg.imports[pkgref];
-
-    // Find any moduleIDs
-    var moduleIDs; // {idname:Identifier}[] -- non-null if any srcfile needs the module itself
-    var moduleMembers = [];
-    var membersMap = {};  // {asID: srcID} -- union of all imps' moduleMembers
-    imps.forEach(function (imp) {
-      if (imp.moduleID) {
-        if (!moduleIDs) moduleIDs = {};
-        moduleIDs[imp.moduleID.name] = imp.moduleID;
-      }
-      imp.members.forEach(function(member){
-        if (membersMap[member.asID.name] !== member.srcID.name) {
-          membersMap[member.asID.name] = member.srcID.name;
-          moduleMembers.push(member);
-        }
-      });
-    });
-
-    var i, varDecls;
-    var requireExpr = B.callExpression(B.identifier('require'), [ B.literal(pkgref) ]);
-
-    if (moduleIDs) {
-      // `var moduleID = require("ref") ...`
-
-      // {idname:Identifier}[] -> Identifier[]
-      moduleIDs = Object.keys(moduleIDs).map(function(k) { return moduleIDs[k]; });
-
-      // Pick _one_ module id for the require
-      var moduleID = moduleIDs[0];
-
-      // `var moduleID = require("ref")`
-      varDecls = [
-        B.variableDeclarator(moduleID, requireExpr)
-      ];
-      // add non-primary module IDs
-      for (i = 1; i !== moduleIDs.length; ++i) {
-        // `altModuleID = moduleID`
-        varDecls.push(B.variableDeclarator(moduleIDs[i], moduleID));
-      }
-      // add module member IDs
-      for (i = 0; i !== moduleMembers.length; ++i) {
-        varDecls.push(
-          B.variableDeclarator(
-            moduleMembers[i].asID,
-            B.memberExpression(moduleID, moduleMembers[i].srcID, false)
-          )
-        );
-      }
-
-      ast.program.body.splice(0,0, B.variableDeclaration('var', varDecls));
-    } else {
-      // `var A, B`
-      varDecls = moduleMembers.map(function(m) { return m.asID; });
-      ast.program.body.splice(0,0, B.variableDeclaration('var', varDecls));
-
-      // `(function(m) { A = m.A; B = m.B; })(require("foo"));`
-      var unexposedModuleID = B.identifier('m');
-      ast.program.body.splice(1,0,
-        B.expressionStatement(
-          B.callExpression(
-            B.functionExpression(
-              null,
-              [ unexposedModuleID ],
-              B.blockStatement(moduleMembers.map(function (member) {
-                // `A = m.A`
-                return B.expressionStatement(
-                  B.assignmentExpression(
-                    '=',
-                    member.asID,
-                    B.memberExpression(
-                      unexposedModuleID,
-                      member.srcID,
-                      false // computed
-                    )
-                  )
-                );
-              }))
-            ),
-            [ requireExpr ]
-          )
-        )
-      );
-
-    }
-  });
-}
-
-
-// AST visitors.
-// Build union of AST visitors used for each SrcFile
-var commonVisitors = {}; [
-  ScopeVisitor.resolve,  // scope pass 2/2
-  TypesVisitor,
-  ImportExportVisitor,
-  ReturnVisitor,
-  __DEV__Visitor,
-].forEach(function(visitor) {
-  Object.keys(visitor).forEach(function(k){
-    var visitorFunc = visitor[k], existingVisitorFunc = commonVisitors[k];
-    if (existingVisitorFunc) {
-      commonVisitors[k] = function(path) {
-        existingVisitorFunc.call(this, path);
-        visitorFunc.call(this, path);
-      };
-    } else {
-      commonVisitors[k] = visitorFunc;
-    }
-  });
-});
-
-
-// function analyzeCode(code) {
-//   var spawn = require('child_process').spawn;
-//   var proc = spawn(
-//     'flow',
-//     [
-//       'check',
-//       '--json',  // Output results in JSON format
-//     ],
-//     { 
-//       cwd: __dirname,  // where our .flowconfig lives
-//       stdio: [
-//         'pipe',    // stdin
-//         'pipe',    // stdout
-//         2          // stderr
-//       ],
-//     }
-//   );
-//   proc.stdio[0].write(code, 'utf8');
-//   proc.stdio[0].end();
-//   proc.stdio[1].on('data', function (data) {
-//     console.log('stdout: ' + data);
-//   });
-//   proc.on('close', function (code) {
-//     console.log('flow exited ' + code);
-//   });
-// }
-
-
-// wrapJSASTInVarCall(pkg:Pkg, ast:AST)
-// function wrapJSASTInVarCall(pkg, ast) {
-//   // wrap in `var pkgid = (function(){ ... })();`
-//   var B = recast.types.builders;
-//   ast.program.body = [
-//     B.variableDeclaration(
-//       "var", [
-//         B.variableDeclarator(
-//           B.identifier(pkg.id),
-//           B.callExpression(
-//             B.functionExpression(
-//               B.identifier(pkg.id),
-//               [], // args
-//               B.blockStatement(
-//                 ast.program.body
-//               )
-//             ),
-//             []//B.emptyExpression() // callExpression args
-//           )
-//         )
-//       ]
-//     )
-//   ];
-// }
