@@ -14,6 +14,15 @@ function ImportError(file, node, message, fixSuggestion, related) {
   return SrcError('ImportError', SrcLocation(node, file), message, fixSuggestion, related);
 }
 
+
+var implicitExportNameRe = /^[A-Z]/u;
+  // TODO: Add all upper-case Unicode letters to the regex, e.g. \uXXXX-\uXXXX ...
+
+function isImplicitExportName(name) {
+  return name.match(implicitExportNameRe) //&& (name[0] === name[0].toUpperCase());
+}
+
+
 export var ModuleTransformer = {
 
   ImportDeclaration(node, parent, scope, file) {
@@ -77,11 +86,10 @@ export var ModuleTransformer = {
       if (node.range && node.range[0] < file.joFirstNonImportOffset) {
         file.joFirstNonImportOffset = node.range[0];
       }
-      var i, c0, id, decls = node.declarations, exportDecls = [];
+      var i, id, decls = node.declarations, exportDecls = [];
       for (i = 0; i !== decls.length; ++i) {
         id = decls[i].id;
-        c0 = id.name[0];
-        if (c0 === c0.toUpperCase()) {
+        if (isImplicitExportName(id.name)) {
           // console.log('export var', repr(decls[i], 2))
           file.joRegisterExport(id.name, decls[i].id, /*isImplicitExport=*/true);
         }
@@ -96,8 +104,7 @@ export var ModuleTransformer = {
       if (node.range && node.range[0] < file.joFirstNonImportOffset) {
         file.joFirstNonImportOffset = node.range[0];
       }
-      let c0 = node.id.name[0];
-      if (c0 === c0.toUpperCase()) {
+      if (isImplicitExportName(node.id.name)) {
         // console.log('export function', repr(node, 2))
         file.joRegisterExport(node.id.name, node.id, /*isImplicitExport=*/true);
       }
@@ -169,16 +176,13 @@ export var ModuleTransformer = {
           // exports.foo
           memberExpr = t.memberExpression(t.identifier("exports"), t.identifier(name));
         }
-        file.ast.program.body.push(
-          t.expressionStatement(
-            t.assignmentExpression(
-              '=',
-              memberExpr,
-              exp.node
-            )
-          )
-          // exp.node
+        let assignmentExpr = t.assignmentExpression(
+          '=',
+          memberExpr,
+          exp.node
         );
+        assignmentExpr._joISImplicitExport = true;
+        file.ast.program.body.push(t.expressionStatement(assignmentExpr));
       });
     }
   }

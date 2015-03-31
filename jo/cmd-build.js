@@ -67,9 +67,8 @@ main: async function(opts, args, usage, cb) {
   let logger = new Logger(opts.D ? Logger.DEBUG : opts.v ? Logger.INFO : Logger.WARN)
 
   // Target
-  let target = Target.create({
-    id:     opts.target || TARGET_NODEJS,
-    mode:   opts.dev ? TARGET_MODE_DEV : TARGET_MODE_RELEASE,
+  let targetMode = opts.dev ? TARGET_MODE_DEV : TARGET_MODE_RELEASE;
+  let target = Target.create(opts.target || TARGET_NODEJS, targetMode, {
     logger: logger,
     output: opts.o,
   })
@@ -78,6 +77,6 @@ main: async function(opts, args, usage, cb) {
   let buildCtx = new BuildCtx(target, logger)
   await Promise.all(pkgs.map(pkg => buildCtx.buildPkg(pkg)))
 
-  // Make product(s)
-  // await target.make(pkgs, logger, opts.o)
+  // Post processing
+  await target.postMake(pkgs)
 }}

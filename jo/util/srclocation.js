@@ -38,11 +38,11 @@ export function SrcLocation(props) {
     return Object.create(SrcLocation.prototype, {
       filename:    {value: filename, enumerable:true},
       code:        {value: file ? file.code : null, enumerable:true},
-      range:       {value: Array.isArray(node.range) ? node.range : [0,0], enumerable:true},
-      startLine:   {value: node.loc ? node.loc.start.line : undefined, enumerable:true},
-      startColumn: {value: node.loc ? node.loc.start.column : undefined, enumerable:true},
-      endLine:     {value: node.loc ? node.loc.end.line : undefined, enumerable:true},
-      endColumn:   {value: node.loc ? node.loc.end.column : undefined, enumerable:true},
+      range:       {value: node && Array.isArray(node.range) ? node.range : [0,0], enumerable:true},
+      startLine:   {value: node && node.loc ? node.loc.start.line : undefined, enumerable:true},
+      startColumn: {value: node && node.loc ? node.loc.start.column : undefined, enumerable:true},
+      endLine:     {value: node && node.loc ? node.loc.end.line : undefined, enumerable:true},
+      endColumn:   {value: node && node.loc ? node.loc.end.column : undefined, enumerable:true},
     });
   } else {
     return Object.create(SrcLocation.prototype, {
@@ -129,10 +129,25 @@ function limitLineLength(line, maxlen, suffix) {
 }
 
 
+SrcLocation.prototype.formatFilename = function(caretColor) {
+  var S = TermStyle.stdout;
+  var msg = (this.filename ? S.bold(S[caretColor](this.filename)) : '');
+  var lc = this.formatLineColumn();
+  return (msg !== '') ? (msg + S.grey(':') + lc) : lc;
+}
+
+
+SrcLocation.prototype.formatLineColumn = function() {
+  return (this.startLine !== undefined) ?
+    TermStyle.stdout.grey(
+      this.startLine + ((this.startColumn !== undefined) ? ':' + this.startColumn : '')
+    )
+    : '';
+}
+
+
 // format(caretColor:string, linesB:int=2, linesA:int=0):string[]
-SrcLocation.prototype.format = function(caretColor, linesB, linesA) {
-  if (linesB === undefined) linesB = 2;
-  if (linesA === undefined) linesA = 0;
+SrcLocation.prototype.formatCode = function(caretColor, linesB=2, linesA=0) {
   var S = TermStyle.stdout, code = this.code;
   var i, n, start, end;
   var maxLineLen = 100, lineLimitSuffix = '...';
@@ -180,9 +195,9 @@ SrcLocation.prototype.format = function(caretColor, linesB, linesA) {
   if (interestingLines.length > 1) {
     abbreviateSourceLines(interestingLines, 4, this.startLine).forEach(function (line, i) {
       if (i === 0) {
-        lines.push(fmtline( caret, 'white', line.no, line.code ));
+        lines.push(fmtline( caret, 'boldWhite', line.no, line.code ));
       } else {
-        lines.push(fmtline( caretSpace, 'grey', line.no, line.code ));
+        lines.push(fmtline( caretSpace, 'white', line.no, line.code ));
       }
     });
   } else {

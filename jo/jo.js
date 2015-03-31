@@ -91,23 +91,3 @@ function init() {
   usage = usage.replace(/\{\{commands\}\}/g, commandsUsage)
 }
 init();
-
-
-if (false) {
-  // var viewsdir = path.normalize(__dirname + '/../views');
-  buildPkg(/*Build*/{
-    pkgdir: process.argv[2],
-    // template: viewsdir + '/view.html',
-    // outfile:  process.argv[3] || 'pkgbuild.out.html',
-  }, function(err, diagnostics) {
-    if (err) {
-      if (SrcError.canFormat(err)) {
-        console.error(SrcError.format(err));
-      } else {
-        console.error(err.stack || err);
-      }
-      process.exit(1);
-    }
-    console.log('done');
-  });
-}

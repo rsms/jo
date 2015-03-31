@@ -106,7 +106,8 @@ class CodeBuffer {
         return [this.addImport(
           imps[0],
           this.genRequireExpr(ref),
-          imps[0].specifiers[0]
+          imps[0].specifiers[0],
+          isLastImp
         )];
       }
     }
@@ -132,24 +133,21 @@ class CodeBuffer {
       );
     }
 
-    for (let i = 0; i !== imps.length; i++) {
-      let imp = imps[i];
-      let isLast = isLastImp && i === imps.length-1;//(defaultImp ? 2 : 1);
-      console.log('isLast', isLast)
+    var specs, remainingImps = [for(imp of imps)
+      if ((specs = [for (s of imp.specifiers) if (s.name.name !== defaultIDName) s]).length)
+        {imp:imp, specs:specs}];
 
-      let xend = imp.specifiers.length-1;
-      for (let x = 0; x !== imp.specifiers.length; x++) {
-        let spec = imp.specifiers[x];
-        if (spec.name.name === defaultIDName) {
-          xend--;
-        } else {
-          names.push(this.addImport(
-            imp,
-            defaultIDName,
-            spec,
-            isLast && x === xend
-          ));
-        }
+    for (let i = 0; i !== remainingImps.length; i++) {
+      let {imp, specs} = remainingImps[i];
+      let isLast = isLastImp && i === remainingImps.length-1;
+      for (let i = 0, lastIndex = specs.length-1; i !== specs.length; i++) {
+        let spec = specs[i];
+        names.push(this.addImport(
+          imp,
+          defaultIDName,
+          spec,
+          isLast && i === lastIndex
+        ));
       }
     }
 
@@ -158,7 +156,7 @@ class CodeBuffer {
 
 
   _defaultNameForImports(imps) {
-    // Is there a default name used for the module?
+    // Is there any default name used for the module?
     for (let imp of imps) {
       for (let spec of imp.specifiers) {
         if (spec.default) {

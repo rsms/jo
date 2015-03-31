@@ -35,20 +35,14 @@ SrcError.formatSource = function(srcloc, message, errname, caretColor, linesB, l
   if (!indent) indent = '';
   var msg = indent;
   if (srcloc && srcloc.filename) {
-    msg += S.bold(S[caretColor](srcloc.filename)) + S.grey(
-      ((srcloc.startLine !== undefined) ?
-        (srcloc.filename ? ':' : '') + srcloc.startLine +
-        ((srcloc.startColumn !== undefined) ? ':' + srcloc.startColumn : '')
-        : ''
-      ) + ': '
-    )
+    msg += srcloc.formatFilename(caretColor) + ': '
   }
   msg += S.bold(message);
   if (errname) {
     msg += ' ' + S.grey('('+errname+')');
   }
   if (srcloc.code && srcloc.startLine !== undefined) {
-    msg += '\n' + indent + srcloc.format(caretColor, linesB, linesA).join('\n'+indent);
+    msg += '\n' + indent + srcloc.formatCode(caretColor, linesB, linesA).join('\n'+indent);
   }
   return msg;
 }
@@ -82,15 +76,17 @@ SrcError.format = function(err, linesB, linesA) {
   }
 
   if (err.related) {
+    let hasFirstSrcLocMsg = !!srcloc && srcloc.filename;
     err.related.forEach(function (related) {
       message += '\n' + SrcError.formatSource(
         related.srcloc,
         related.message,
         null,
-        'magenta',
+        hasFirstSrcLocMsg ? 'magenta' : 'red',
         linesB,
         linesA,
-        '    ');
+        hasFirstSrcLocMsg ? '    ' : null);
+      hasFirstSrcLocMsg = true;
     });
   }
 

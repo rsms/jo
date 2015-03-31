@@ -2,14 +2,20 @@
 var recast = require('recast');
 var B = recast.types.builders;
 
-import {JSIdentifier, SrcError, SrcLocation, repr} from './util'
+import {JSIdentifier, SrcError, SrcLocation, repr, Unique} from './util'
 
 import * as babel from 'babel'
 import BabelFile from 'babel/lib/babel/transformation/file';
 import Transformer from 'babel/lib/babel/transformation/transformer'
-import { ModuleTransformer, FileLocalVarsTransformer } from './transformers'
+import {
+  ModuleTransformer,
+  FileLocalVarsTransformer,
+  ClassHierarchyTransformer
+} from './transformers'
 
 // Register jo transformers (wish there was a non-mutating API for this)
+babel.transform.transformers['jo.classes'] =
+  new Transformer('jo.classes', ClassHierarchyTransformer);
 babel.transform.transformers['jo.modules'] =
   new Transformer('jo.modules', ModuleTransformer);
 babel.transform.transformers['jo.fileLocalVars'] =
@@ -17,6 +23,38 @@ babel.transform.transformers['jo.fileLocalVars'] =
 
 function ExportError(file, node, message, fixSuggestion, related) {
   return SrcError('ExportError', SrcLocation(node, file), message, fixSuggestion, related);
+}
+
+function ReferenceError(file, node, message, related) {
+  return SrcError('ReferenceError', SrcLocation(node, file), message, null, related);
+}
+
+function CyclicReferenceError(pkg, name, fileA, fileB, deps, onlyClasses:bool) {
+  let errs = [
+    { message: `"${name}" defined here`,
+      srcloc:  SrcLocation(fileB.definedIDs[name].node, fileB) },
+    { message: `"${name}" referenced here`,
+      srcloc:  SrcLocation(fileA.unresolvedIDs[name].node, fileA) }
+  ];
+  deps.forEach(dep => {
+    if (!onlyClasses || dep.defNode.type === 'ClassExpression') {
+      errs.push({
+        message: `"${dep.name}" defined here`,
+        srcloc:  SrcLocation(dep.defNode, fileA)
+      });
+      errs.push({
+        message: `"${dep.name}" referenced here`,
+        srcloc:  SrcLocation(dep.refNode, fileB)
+      });
+    }
+  });
+  return ReferenceError(
+    null,
+    null,
+    `cyclic dependency between source files "${fileA.name}" and "${fileB.name}"`+
+    ` in package "${pkg.id}"`,
+    errs
+  );
 }
 
 
@@ -82,28 +120,36 @@ class PkgCompiler {
   constructor(pkg, target) {
     this.pkg = pkg
     this.target = target
+    this.log = this.target.log
     this._nextAnonID = 0;
   }
 
   // async compile(srcfiles:SrcFile[]):CodeBuffer
   async compile(srcfiles) {
     // load code and ast for each source file of the package
-    var parsed = await this.parseFiles(srcfiles)
+    await this.parseFiles(srcfiles)
 
-    // Code buffer
+    // Resolve inter-file dependencies (e.g. fileC -> fileA -> fileB)
+    this.resolveInterFileDeps(srcfiles)
+
+    // Sort srcfiles by symbol dependency
+    this.sortFiles(srcfiles);
+
+    // Log some details about inter-file deps
+    if (this.log.level >= Logger.DEBUG) {
+      this.log.debug(this.buildDepDescription(srcfiles));
+    }
+
+    // Code buffer we'll use to build module code
     var codebuf = new CodeBuffer;
 
     // Add header
-    // console.log('fileImports:', repr(imports))
-    this.genHeader(srcfiles, parsed, codebuf);
-    // console.log('genImportsHeader:', codebuf.code);
+    this.genHeader(srcfiles, codebuf);
 
     // Add source files
-    // TODO: sort by class hierarchy
-    for (let i = 0, L = parsed.length; i !== L; i++) {
-      let parseRes = parsed[i];
-      // let srcfile = srcfiles[i];
-      codebuf.addMappedCode(parseRes.code, parseRes.map);
+    for (let i = 0, L = srcfiles.length; i !== L; i++) {
+      let srcfile = srcfiles[i];
+      codebuf.addMappedCode(srcfile.parsed.code, srcfile.parsed.map);
     }
 
     console.log(codebuf.code);
@@ -111,8 +157,8 @@ class PkgCompiler {
   }
 
 
-  // (srcfiles:SrcFile[], parsed:ParseResult[], codebuf:CodeBuffer)
-  genHeader(srcfiles, parsed, codebuf) {
+  // (srcfiles:SrcFile[], codebuf:CodeBuffer)
+  genHeader(srcfiles, codebuf) {
     //  E.g.
     //    var _$0 = require('pkg1'), _$1 = require('pkg2');
     //    var file1$a = _$0, file1$b = _$0.B;
@@ -125,9 +171,9 @@ class PkgCompiler {
     var importRefs = {};
 
     // Sort by unique refs, and separate runtime helpers
-    for (let i = 0, L = parsed.length; i !== L; ++i) {
+    for (let i = 0, L = srcfiles.length; i !== L; ++i) {
       let srcfile = srcfiles[i];
-      let imports = parsed[i].imports;
+      let imports = srcfile.parsed.imports;
       for (let imp of imports) {
         if (imp.jo_isRuntimeHelper) {
           runtimeImps[imp.source.value] = imp;
@@ -170,20 +216,26 @@ class PkgCompiler {
 
       // Add regular imports and assign {ref: [name, name ...]} to pkg.imports
       this.pkg.imports = codebuf.addModuleImports(importRefs);
-      console.log('pkg.imports:', repr(this.pkg.imports,2));
+      // console.log('pkg.imports:', repr(this.pkg.imports,2));
     }
   }
 
 
-  // async parseFiles(srcfiles:SrcFile[]):ParseResult[]
+  // async parseFiles(srcfiles:SrcFile[])
   parseFiles(srcfiles) {
     return Promise.all(srcfiles.map(async (srcfile, index) => {
       srcfile.code = await fs.readFile(srcfile.dir + '/' + srcfile.name, 'utf8')
       srcfile.id = srcfile.name.replace(/[^a-z0-9_]/g, '_')
       try {
-        return this.parseFile(srcfile, /*isLastFile=*/index === srcfiles.length-1);
-        // srcfile.ast = recast.parse(source, {sourceFileName: srcfile.relpath, range: true })
-        // this.transformJS(srcfile)
+        //var [code, sourceMap] = this.preprocessFile(srcfile);
+        var code = srcfile.code;
+        var sourceMap = null;
+        srcfile.parsed = this.parseFile(
+          srcfile,
+          code,
+          sourceMap,
+          /*isLastFile=*/index===srcfiles.length-1
+        );
       } catch (err) {
         if (!err.srcfile) err.file = srcfile;
         throw err;
@@ -192,10 +244,17 @@ class PkgCompiler {
   }
 
 
+  preprocessFile(srcfile:SrcFile):[string,SourceMap] {
+    var pp = new Preprocessor;
+    return pp.process(srcfile);
+  }
+
+
   // parseFile(srcfile:SrcFile, isLastFile:bool):ParseResult
-  parseFile(srcfile, isLastFile) {
+  parseFile(srcfile, code, inSourceMap, isLastFile) {
     var bopts = {
       filename:          srcfile.name,
+      inputSourceMap:    inSourceMap,
       sourceMap:         true,     // generate SourceMap
       sourceMapName:     'out.map',
       sourceRoot:        srcfile.dir,
@@ -208,18 +267,46 @@ class PkgCompiler {
       modules:           'ignore',
       blacklist:         this.target.disabledTransforms(['es6.modules']),
       optional:          this.target.transforms([
-        // Transformers suggested for the target
-        'jo.modules',
+        'jo.modules',  // must be first
         'runtime',
-        'utility.inlineEnvironmentVariables'
       ]).concat([
-        // Required transformers
-        'jo.fileLocalVars',
+        'jo.classes',
+        'jo.fileLocalVars', // must be last
       ]),
     };
 
     var T = babel.types;
     var bfile = new BabelFile(bopts);
+
+    // sort transformers.
+    //   Note: yeah, this is messed up. Internally Babel relies on object-literal key order
+    //   of v8, so this code might break the day v8's internals changes.
+    var tKeys = [for (t of bfile.transformerStack) t.transformer.key];
+    var beforeIndex = tKeys.indexOf('utility.deadCodeElimination');
+    if (beforeIndex === -1) {
+      beforeIndex = tKeys.indexOf('_cleanUp');
+    }
+    var startKey = tKeys.indexOf('jo.modules');
+    var endKey = tKeys.indexOf('jo.fileLocalVars');
+    var joTransformers = bfile.transformerStack.splice(startKey, endKey-startKey+1);
+    joTransformers.splice(0,0, beforeIndex, 0);
+    bfile.transformerStack.splice.apply(bfile.transformerStack, joTransformers);
+
+    // Place our class explorer transformer above the es6 class transformer
+    tKeys = [for (t of bfile.transformerStack) t.transformer.key];
+    var joClassTIndex = tKeys.indexOf('jo.classes');
+    if (joClassTIndex !== -1) {
+      var es6ClassTIndex = tKeys.indexOf('es6.classes');
+      if (es6ClassTIndex !== -1 && joClassTIndex > es6ClassTIndex) {
+        bfile.transformerStack.splice(
+          es6ClassTIndex,
+          0,
+          bfile.transformerStack.splice(joClassTIndex,1)[0]
+        );
+      }
+    }
+    // console.log('transformers:', [for (t of bfile.transformerStack) t.transformer.key])
+
     bfile.jofile = srcfile;
     bfile.joFileIDName = '_' + srcfile.id;
     bfile.joFirstNonImportOffset = Infinity;
@@ -308,12 +395,207 @@ class PkgCompiler {
       return newID;
     };
 
-    var res = bfile.parse(srcfile.code);
+    var res = bfile.parse(code);
     res.imports = bfile.joImports;
     // console.log('babel.transform:', res.code)
     // console.log('bfile.joImports:', bfile.joImports)
 
     return /*ParseResult*/res;
+  }
+
+
+  resolveInterFileDeps(srcfiles:SrcFile[]) {
+    this._detectedDependencies = {}; // {srcfile.name: {file:srcfile.name, refNode:ASTNode}, ...}
+    var pkg = this.pkg;
+
+    // console.log([for (f of srcfiles)
+    //   { file: f.name,
+    //     unresolvedIDs: f.unresolvedIDs ? Object.keys(f.unresolvedIDs) : null,
+    //     definedIDs: f.definedIDs ? Object.keys(f.definedIDs) : null
+    //   } ]);
+
+    // First pass: resolve symbols for each file with each other file. E.g. for A,B,C:
+    //   test if A needs B
+    //   test if A needs C
+    //   test if B needs A
+    //   test if B needs C
+    //   test if C needs A
+    //   test if C needs B
+    //
+    for (let x = 0; x !== srcfiles.length; x++) {
+      for (let y = 0; y !== srcfiles.length; y++) {
+        if (x !== y) {
+          this._resolveFileDeps(srcfiles[x], srcfiles[y]);
+        }
+      }
+    }
+
+    // Check for unresolved IDs
+    var errs = null;
+    srcfiles.forEach(file => {
+      if (file.unresolvedIDs && Object.keys(file.unresolvedIDs).length !== 0) {
+        if (!errs) errs = [];
+        for (let name of Object.keys(file.unresolvedIDs)) {
+          errs.push({
+            message: `unresolvable identifier "${name}"`,
+            srcloc:  SrcLocation(file.unresolvedIDs[name].node, file)
+          });
+        }
+      }
+    });
+    if (errs) {
+      if (errs.length === 1) {
+        throw SrcError('ReferenceError', errs[0].srcloc, errs[0].message);
+      } else {
+        throw SrcError('ReferenceError', null, 'unresolvable identifiers', null, errs);
+      }
+    }
+  }
+
+
+  buildDepDescription(srcfiles:SrcFile[]) {
+    var intersectKeys = function(a, b) {
+      return [for (k of Object.keys(a)) if (b[k]) k ];
+    };
+
+    let msg = this.log.style.boldGreen(this.pkg.id)+' inter-file dependencies:';
+    let filenames = [for (f of srcfiles) if (this._detectedDependencies[f.name]) f.name];
+
+    for (let filename of filenames) {
+      let depnames = Unique(this._detectedDependencies[filename].map(d => d.file.name));
+      msg += '\n  '+
+        this.log.style.boldCyan(filename)+' depends on:';
+
+      let refs = {};
+      let dependeeFile = null;
+      this._detectedDependencies[filename].forEach(dep => {
+        if (!refs[dep.file.name]) { refs[dep.file.name] = {}; }
+        for (let k in dep.file.definedIDs) {
+          refs[dep.file.name][k] = {id:dep.file.definedIDs[k], file:dep.file};
+        }
+        if (!dependeeFile) {
+          dependeeFile = dep.dependeeFile;
+        }
+      });
+
+      for (let fn of Object.keys(refs)) {
+        let ref = refs[fn];
+        let ids = intersectKeys(ref, dependeeFile.resolvedIDs);
+
+        msg += '\n    ' + this.log.style.boldYellow(fn);
+
+        for (let id of ids) {
+          let node = ref[id].id.node;
+          if (node.type === 'FunctionDeclaration' || node.type === 'ClassExpression') {
+            node = node.id;
+          }
+          let srcloc = SrcLocation(node, ref[id].file);
+          let ln = '\n    ';
+          msg += ln + srcloc.formatCode('boldYellow', 0, 0).join(ln);
+        }
+      }
+    }
+    return msg
+  }
+
+
+  fileDependsOn(fileA, fileB) {
+    var dep = this._detectedDependencies[fileA.name];
+    // if (dep && dep.some(o => o.file === fileB) {  //<= for any, not just classes
+    if (dep && dep.some(o => o.file === fileB)) {
+      return dep;
+    }
+  };
+
+
+  fileDependsOnClasses(fileA, fileB) {
+    var dep = this._detectedDependencies[fileA.name];
+    // if (dep && dep.some(o => o.file === fileB) {  //<= for any, not just classes
+    if (dep && dep.some(o => o.file === fileB && o.defNode.type === 'ClassExpression')) {
+      return dep;
+    }
+  };
+
+
+  _resolveFileDeps(fileA, fileB) {
+    // console.log('_resolveFileDeps:', fileA.name, '=>', fileB.name);
+    if (!fileA.unresolvedIDs || !fileB.definedIDs) {
+      return;
+    }
+
+    for (let name of Object.keys(fileA.unresolvedIDs)) {
+      let definition = fileB.definedIDs[name];
+      if (definition) {
+        let classRef = fileA.unresolvedSuperclassIDs ? fileA.unresolvedSuperclassIDs[name] : null;
+
+        // Has inverse class dependency? (i.e. cyclic)
+        let deps;
+        if ( classRef && (deps = this.fileDependsOnClasses(fileB, fileA)) ) {
+          throw CyclicReferenceError(this.pkg, name, fileA, fileB, deps, /*onlyClasses=*/true);
+        }
+
+        // Register dependency
+        let fileDeps = this._detectedDependencies[fileA.name];
+        if (!fileDeps) {
+          this._detectedDependencies[fileA.name] = fileDeps = [];
+        }
+        fileDeps.push({
+          // This is only used for error reporting, which is why we "return" later on
+          // here, not storing all names (but just the first we find) for this dependency.
+          dependeeFile:fileA,
+          file:fileB,
+          name:name,
+          defNode:definition.node,
+          refNode:fileA.unresolvedIDs[name].node,
+        });
+
+        // Remove resolved name from list of unresolved IDs
+        if (!fileA.resolvedIDs) { fileA.resolvedIDs = {}; }
+        fileA.resolvedIDs[name] = fileA.unresolvedIDs[name];
+        if (Object.keys(fileA.unresolvedIDs).length === 1) {
+          fileA.unresolvedIDs = null;
+        } else {
+          delete fileA.unresolvedIDs[name];
+        }
+      }
+    }
+  }
+
+
+  // Sorts files in-place based on fileDependsOn(A,B)
+  sortFiles(srcfiles:SrcFile[]) {
+    // console.log('srcfiles (before sorting):', [for (f of srcfiles) f.name])
+
+    // Now sort by dependencies
+    srcfiles.sort((fileA, fileB) => {
+      if (fileA.unresolvedSuperclassIDs || fileB.unresolvedSuperclassIDs) {
+        // Either or both files have class dependencies across other files, so order
+        // based on class hierarchy.
+
+        // Does fileB provide any reference that fileA needs?
+        if (this.fileDependsOnClasses(fileA, fileB)) {
+          return 1; // fileA comes before fileB
+        }
+
+        // Does fileA provide any reference that fileB needs?
+        if (this.fileDependsOnClasses(fileB, fileA)) {
+          return -1; // fileA comes before fileB
+        }
+      }
+
+      if (this.fileDependsOn(fileA, fileB)) {
+        return 1; // fileA comes before fileB
+      }
+
+      if (this.fileDependsOn(fileB, fileA)) {
+        return -1; // fileA comes before fileB
+      }
+
+      // No difference
+      return 0;
+    });
+
+    // console.log('srcfiles (after sorting):', [for (f of srcfiles) f.name]);
   }
 
 

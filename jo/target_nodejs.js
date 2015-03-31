@@ -1,7 +1,7 @@
 
 class NodeJSTarget extends Target {
-  constructor() {
-    super();
+  constructor(id, mode, options) {
+    super(id, mode, options);
     this.registerGlobals([
       'global',
       'process',

@@ -12,8 +12,49 @@ var Targets = {}
 //   map:SourceMap
 // }
 
+function _$record(name, prototype) {
+  var toString = function(){
+    return "<record "+this.__name+" "+JSON.stringify(this)+">";
+  };
+  Object.defineProperties(prototype, {
+    __name: {value:name},
+    toString: {value:toString},
+  });
+  Object.freeze(prototype);
+  var record = function(properties) {
+    var k, v, props = {};
+    for (k in properties) {
+      v = props[k];
+      if (v !== undefined) {
+        props[k] = {value:v, enumerable:true, configurable:true};
+      } else if (!(k in prototype)) {
+        throw new Error('unexpected property '+JSON.stringify(k)+' assigned to record '+name);
+      }
+    }
+    return Object.create(prototype, props);
+  };
+  record.default = prototype;
+  return record;
+}
+
+// record TargetOptions {
+//   logger:Logger
+//   output:string = null
+//   warningsAsErrors:bool = false
+// }  preprocessed to:
+type TargetOptions = {
+  logger:Logger;
+  output:string;
+  warningsAsErrors:bool;
+}
+var TargetOptions = _$record("TargetOptions", {
+  logger: undefined, // Logger
+  output: null,      // string
+  warningsAsErrors: false, // bool
+});
+
 class Target {
-  static create({id, mode, logger, output}) {
+  static create(id:string, mode:int, options:TargetOptions=TargetOptions.default) {
     switch (mode) {
       case undefined: case null: mode = TARGET_MODE_RELEASE; break;
       case TARGET_MODE_RELEASE: case TARGET_MODE_DEV: break;
@@ -21,27 +62,33 @@ class Target {
     }
     var t;
     switch (id.toLowerCase()) {
-      case TARGET_BROWSER:                    t = new BrowserTarget;break;
-      case TARGET_BROWSER_WEBKIT || 'webkit': t = new WebkitTarget; break;
-      case TARGET_NODEJS:                     t = new NodeJSTarget; break;
+      case TARGET_BROWSER:                    t = new BrowserTarget(id, mode, options);break;
+      case TARGET_BROWSER_WEBKIT || 'webkit': t = new WebkitTarget(id, mode, options); break;
+      case TARGET_NODEJS:                     t = new NodeJSTarget(id, mode, options); break;
       default: throw new Error(`unknown target identifier "${id}"`)
     }
-    t.id = id;
-    t.mode = mode;
-    t.logger = logger;
-    t.output = output;
     return t;
   }
 
-  constructor() {
-    this.globals = {'this':1, 'undefined':1};
-    this.undefinedReferenceIsError = false;
+  constructor(id, mode, options) {
+    this.id = id;
+    this.mode = mode;
+    this.options = options;
+    this.globals = {'this':1, 'undefined':1, 'arguments':1};
   }
 
   registerGlobals(globals) {
     globals.forEach(id => {
       this.globals[id] = true;
     });
+  }
+
+  get log() {
+    return this.options.logger
+  }
+
+  get isDevMode() {
+    return this.mode === TARGET_MODE_DEV;
   }
 
   // targetForDependency:Target
@@ -56,10 +103,10 @@ class Target {
 
   moduleFilename(pkg:Pkg, depLevel:int) {
     // return null to indicate that the module should not be stored.
-    if (this.output && depLevel === 0) {
+    if (this.options.output && depLevel === 0) {
       // Assume whatever set "output" made sure there's only one top-level
       // package. Now, return "output" for that top-level package `pkg`.
-      return this.output;
+      return this.options.output;
     }
     let t = this.id + '.' + this.mode
     if (pkg.jopath && pkg.ref) {
@@ -80,24 +127,14 @@ class Target {
     // Transforms based on "debug" or "release" build settings:
     if (this.mode === TARGET_MODE_RELEASE) {
       transforms = transforms.concat([
-        'utility.removeConsole',      // `console...` -> ``
-        'utility.removeDebugger',     // `debugger` -> ``
-        'utility.inlineExpressions',  // `5 * 1024` -> `5120`, `"a" === "a"` -> `true`, etc
-        'utility.deadCodeElimination',
-          // strips things like:
-          //
-          // if ("dev" === "dev") {
-          //   lets_play();
-          // } else {
-          //   do_business();
-          // }
-          //
-          // into
-          // do_business();
+        'utility.removeConsole',       // `console...` -> ``
+        'utility.removeDebugger',      // `debugger` -> ``
+        'utility.inlineExpressions',   // `5 * 1024` -> `5120`, `"a" === "a"` -> `true`, etc
+        'utility.deadCodeElimination', // `if (0) { foo(); } else { bar(); }` -> `bar();`
       ]);
     } else { // dev
       transforms = transforms.concat([
-        // 'es6.blockScopingTDZ',  // insert checks for "temporal-dead zone" referenced `let`
+        'es6.blockScopingTDZ',  // insert checks for "temporal-dead zone" referenced `let`
       ]);
     }
 
@@ -110,35 +147,10 @@ class Target {
   }
 
 
-  // (pkgs:Pkg[], logger:Logger, output?:string)
-  async make(pkgs, logger, output=null) {
-    throw `Target.make not implemented for target ${this.id}`
-  }
-
-
-  // codegen(filename:string, code:string, map:SourceMap):Program
-  codegen(filename, code, map) {
-    process.env.JO_BUILD_MODE = this.mode;  // for __DEV__
-    // Note: Can't "import" babel, as babel's interopRequire does weird things
-    var product = require('babel').transform(code, {
-      filename:          filename,
-      inputSourceMap:    map,
-      sourceMap:         true,     // generate SourceMap
-      sourceMapName:     'out.map',
-      sourceRoot:        map.sourceRoot,
-      code:              true,     // output JavaScript code
-      ast:               false,    // output AST
-      experimental:      true,     // enable things like ES7 features
-      compact:           this.mode === TARGET_MODE_RELEASE,   // "minify"
-      comments:          this.mode === TARGET_MODE_DEV,  // include comments in output
-      returnUsedHelpers: false,    // return information on what helpers are needed/was added
-      modules:           this.moduleType,
-      optional:          this.transforms,
-      blacklist:         this.disabledTransforms,
-    })
-    delete process.env.JO_BUILD_MODE;
-    delete product.map.file;
-    return product;
+  // postMake is called after all packages and dependencies have been successfully compiled.
+  // The target might choose to perform some kind of post-processing at this stage. Or not.
+  // (pkgs:Pkg[])
+  async postMake(pkgs) {
   }
 
 }

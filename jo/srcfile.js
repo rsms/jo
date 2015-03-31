@@ -4,6 +4,9 @@
 //   name:string      // e.g. "bar.js"
 //   st:fs.Stat
 //   files:SrcFile[]  // if st.isDirectory()
+//   parsed?:ParseResult
+//   unresolvedIDs?:{name:ASTNode}
+//   definedIDs?:{name:ASTNode}
 // }
 
 class SrcFile {
