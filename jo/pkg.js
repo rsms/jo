@@ -17,10 +17,15 @@ class Pkg {
     this.exports = {}
     this.module = null
     this.deps = []
+    this.pkgInfo = null
   }
 
   get id() { 
     return this.ref || this.dir
+  }
+
+  get hasMainFunc() {
+    return !!this.mainFunc || (this.pkgInfo && this.pkgInfo.main);
   }
 
   // parsePkgInfo(code:string):PkgInfo
@@ -48,34 +53,13 @@ class Pkg {
     return output
   }
 
-  // irModuleFile():string
-  irModuleFile() {
-    if (this.jopath && this.ref) {
-      // E.g.
-      //  this.ref="fb/react"
-      //  this.jopath="/home/rsms/jo"
-      //  => "/home/rsms/jo/pkg/ir/fb/react.js"
-      return this.jopath + '/pkg/ir/' + this.ref + '.js'
-    } else {
-      // E.g.
-      //  this.ref="fb/react"
-      //  WorkDir.path="/tmp/jo-1234"
-      //  => "/tmp/jo-1234/pkg/ir/fb/react.js"
-      return WorkDir.path + '/' +
-        ( this.ref ? 'pkg/ir/' + this.ref :
-                     'pkgdir/ir' + this.dir
-        ) + '.js'
-    }
-  }
-
 
   // async loadSrcFiles():SrcFile[]
   loadSrcFiles() {
     return Promise.all(this.files.map(async (fn) => {
-      let filename = this.dir + '/' + fn
-      let st = await fs.stat(filename)
-      let type = path.extname(fn).substr(1).toLowerCase()
-      if (type === '') { throw `unknown type of file: "${fn}"` }
+      let filename = this.dir + '/' + fn;
+      let st = await fs.stat(filename);
+      let type = path.extname(fn).substr(1).toLowerCase();
       return /*SrcFile*/{
         dir:     this.dir,
         name:    fn,
@@ -120,7 +104,7 @@ class Pkg {
     } else {
       // ref
       try {
-        let [_files, pkgdir, jopath] = await Env.readdir('src/' + ref)
+        let [_files, pkgdir, jopath] = await Pkg._envReadRefSrcDir(ref)
         files = _files.filter(SrcFile.filenameMatches)
         pkg   = new Pkg({ref:ref, dir:pkgdir, files:files, jopath:parentPkg.jopath})
       } catch (e) { importError = e; }
@@ -138,16 +122,24 @@ class Pkg {
   }
 
 
+  static async _envReadRefSrcDir(ref) {
+    try {
+      return await Env.readdir('src/' + ref)
+    } catch (e) {}
+    return await Env.readdir(ref)
+  }
+
+
   // (ref:string)
   static async fromRef(ref) {
     let files, pkg
     if (ref[0] === '.' || ref[0] === '/') {
       // pathname
-      files = (await fs.readdir(pkgdir)).filter(SrcFile.filenameMatches)
-      pkg   = new Pkg({ref:null, dir:pkgdir, files:files, jopath:null})
+      files = (await fs.readdir(ref)).filter(SrcFile.filenameMatches)
+      pkg   = new Pkg({ref:null, dir:ref, files:files, jopath:null})
     } else {
       // pkgref
-      let [_files, pkgdir, jopath] = await Env.readdir('src/' + ref)
+      let [_files, pkgdir, jopath] = await Pkg._envReadRefSrcDir(ref)
       files = _files.filter(SrcFile.filenameMatches)
       pkg   = new Pkg({ref:ref, dir:pkgdir, files:files, jopath:jopath})
     }

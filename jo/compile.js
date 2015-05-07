@@ -7,6 +7,7 @@ import {JSIdentifier, SrcError, SrcLocation, repr, Unique} from './util'
 import * as babel from 'babel'
 import BabelFile from 'babel/lib/babel/transformation/file';
 import Transformer from 'babel/lib/babel/transformation/transformer'
+import BabelGen from 'babel/lib/babel/generation'
 import {
   ModuleTransformer,
   FileLocalVarsTransformer,
@@ -116,9 +117,9 @@ function CyclicReferenceError(pkg, name, fileA, fileB, deps, onlyClasses:bool) {
 
 class PkgCompiler {
 
-  // (pkg:Pkg, target:Target)
-  constructor(pkg, target) {
+  constructor(pkg:Pkg, mod:Module, target:Target) {
     this.pkg = pkg
+    this.module = mod
     this.target = target
     this.log = this.target.log
     this._nextAnonID = 0;
@@ -133,7 +134,7 @@ class PkgCompiler {
     this.resolveInterFileDeps(srcfiles)
 
     // Sort srcfiles by symbol dependency
-    this.sortFiles(srcfiles);
+    srcfiles = this.sortFiles(srcfiles);
 
     // Log some details about inter-file deps
     if (this.log.level >= Logger.DEBUG) {
@@ -152,7 +153,10 @@ class PkgCompiler {
       codebuf.addMappedCode(srcfile.parsed.code, srcfile.parsed.map);
     }
 
-    console.log(codebuf.code);
+    // Add footer
+    this.genFooter(srcfiles, codebuf);
+
+    // console.log(codebuf.code);
     return codebuf;
   }
 
@@ -199,9 +203,26 @@ class PkgCompiler {
       'babel-runtime': Object.keys(runtimeImps).map(ref => {
         return ref.substr(runtimeRefPrefixLen);
       }),
+      version: Date.now().toString(36),
     };
+    if (this.pkg.hasMainFunc) {
+      pkginfo.main = true;
+    }
+    this.pkg.pkgInfo = pkginfo;
     codebuf.addLine('//#jopkg'+JSON.stringify(pkginfo));
-    codebuf.addLine('//#sourceMappingURL=index.js.map');
+    if (this.module.file) {
+      codebuf.addLine('//#sourceMappingURL='+path.basename(this.module.file)+'.map');
+    }
+
+    // Add any target header
+    if (this.target.pkgModuleHeader) {
+      let targetHeaderCode = this.target.pkgModuleHeader(this.pkg).trim();
+      if (targetHeaderCode) {
+        targetHeaderCode.split(/\r?\n/g).forEach(line => {
+          codebuf.addLine(line);
+        });
+      }
+    }
 
     // Add imports
     if (Object.keys(runtimeImps).length !== 0 || Object.keys(importRefs).length !== 0) {
@@ -221,6 +242,108 @@ class PkgCompiler {
   }
 
 
+  genFooter(srcfiles, codebuf) {
+    // Add calls to any init() functions
+    for (let srcfile of srcfiles) {
+      if (srcfile.initFuncName) {
+        codebuf.addLine(srcfile.initFuncName + '();');
+      }
+    }
+
+    // Generate exports
+    this.genExports(srcfiles, codebuf)
+
+    // Add any target footer
+    if (this.target.pkgModuleFooter) {
+      let s = this.target.pkgModuleFooter(this.pkg).trim();
+      if (s) {
+        s.split(/\r?\n/g).forEach(line => {
+          codebuf.addLine(line);
+        });
+      }
+    }
+  }
+
+
+  // Returns { filename: [Export, ...], ...}
+  exportsGroupedByFile(srcfiles) {
+    var exports = {};
+    for (let name in this.pkg.exports) {
+      let exp = this.pkg.exports[name];
+      let expv = exports[exp.file.name];
+      if (!expv) {
+        exports[exp.file.name] = [exp];
+      } else {
+        expv.push(exp);
+      }
+    }
+    return exports;
+  }
+
+
+  genExports(srcfiles, codebuf) {
+    var exportsByFile = this.exportsGroupedByFile(srcfiles);
+    var exportFilenames = Object.keys(exportsByFile);
+    if (exportFilenames.length === 0) {
+      // nothing exported
+      return;
+    }
+
+    // var lastFile = srcfiles[srcfiles.length-1];
+
+    var t = babel.types;
+
+    for (let filename in exportsByFile) {
+      let exports = exportsByFile[filename];
+      //let ast = { type: 'Program', body: [], comments: [], tokens: [] };
+      let srcfile = exports[0].file;
+
+      for (let exp of exports) {
+        let ast = { type: 'Program', body: [], comments: [], tokens: [] };
+        let memberExpr;
+
+        if (exp.name === 'default') {
+          // Generate `exports.__esModule = true`
+          // Note: intentionally no srcloc
+          codebuf.appendCode(
+            this.codegen(
+              t.expressionStatement(
+                t.assignmentExpression(
+                  '=',
+                  t.memberExpression(t.identifier("exports"), t.identifier("__esModule")),
+                  t.literal(true)
+                )
+              )
+            )
+          );
+          // AST `exports["default"]`
+          memberExpr = t.memberExpression(t.identifier("exports"), t.literal(exp.name), true);
+        } else {
+          // AST `exports.foo`
+          memberExpr = t.memberExpression(t.identifier("exports"), t.identifier(exp.name));
+        }
+
+        // Generate `exports... = something`
+        let assignmentExpr = t.assignmentExpression('=', memberExpr, exp.node);
+        let code = this.codegen(t.expressionStatement(assignmentExpr));
+        codebuf.appendCode(code, SrcLocation(exp.node, exp.file));
+      }
+    }
+  }
+
+
+  codegen(ast) {
+    return BabelGen(ast, {
+      code:              true,
+      ast:               false,
+      experimental:      true,     // enable things like ES7 features
+      compact:           this.target.mode === TARGET_MODE_RELEASE,   // "minify"
+      comments:          this.target.mode === TARGET_MODE_DEV,  // include comments in output
+      returnUsedHelpers: false,    // return information on what helpers are needed/was added
+    }).code;
+  }
+
+
   // async parseFiles(srcfiles:SrcFile[])
   parseFiles(srcfiles) {
     return Promise.all(srcfiles.map(async (srcfile, index) => {
@@ -230,12 +353,7 @@ class PkgCompiler {
         //var [code, sourceMap] = this.preprocessFile(srcfile);
         var code = srcfile.code;
         var sourceMap = null;
-        srcfile.parsed = this.parseFile(
-          srcfile,
-          code,
-          sourceMap,
-          /*isLastFile=*/index===srcfiles.length-1
-        );
+        srcfile.parsed = this.parseFile(srcfile, code, sourceMap);
       } catch (err) {
         if (!err.srcfile) err.file = srcfile;
         throw err;
@@ -250,8 +368,8 @@ class PkgCompiler {
   }
 
 
-  // parseFile(srcfile:SrcFile, isLastFile:bool):ParseResult
-  parseFile(srcfile, code, inSourceMap, isLastFile) {
+  // parseFile(srcfile:SrcFile, code:string, inSourceMap:SourceMap):ParseResult
+  parseFile(srcfile, code, inSourceMap) {
     var bopts = {
       filename:          srcfile.name,
       inputSourceMap:    inSourceMap,
@@ -311,7 +429,6 @@ class PkgCompiler {
     bfile.joFileIDName = '_' + srcfile.id;
     bfile.joFirstNonImportOffset = Infinity;
     bfile.joImports = []; // ImportDeclaration[]
-    bfile.joIsLastFile = isLastFile;
     bfile.joPkg = this.pkg;
     bfile.joTarget = this.target;
 
@@ -383,7 +500,13 @@ class PkgCompiler {
           )
         }
       }
-      bfile.joPkg.exports[name] = {file:bfile.jofile, node:node, isImplicit:isImplicitExport};
+
+      bfile.joPkg.exports[name] = {
+        name:name,
+        file:bfile.jofile,
+        node:node,
+        isImplicit:isImplicitExport
+      };
     };
 
     bfile.joRemappedIdentifiers = {};
@@ -501,7 +624,6 @@ class PkgCompiler {
 
   fileDependsOn(fileA, fileB) {
     var dep = this._detectedDependencies[fileA.name];
-    // if (dep && dep.some(o => o.file === fileB) {  //<= for any, not just classes
     if (dep && dep.some(o => o.file === fileB)) {
       return dep;
     }
@@ -510,7 +632,12 @@ class PkgCompiler {
 
   fileDependsOnClasses(fileA, fileB) {
     var dep = this._detectedDependencies[fileA.name];
-    // if (dep && dep.some(o => o.file === fileB) {  //<= for any, not just classes
+    // if (dep) {
+    //   console.log('fileDependsOnClasses: dep:');
+    //   for (let o of dep) {
+    //     console.log('  ' + o.file.name);
+    //   }
+    // }
     if (dep && dep.some(o => o.file === fileB && o.defNode.type === 'ClassExpression')) {
       return dep;
     }
@@ -563,10 +690,11 @@ class PkgCompiler {
 
 
   // Sorts files in-place based on fileDependsOn(A,B)
-  sortFiles(srcfiles:SrcFile[]) {
+  sortFiles(srcfiles:SrcFile[]):SrcFile[] {
     // console.log('srcfiles (before sorting):', [for (f of srcfiles) f.name])
 
     // Now sort by dependencies
+    srcfiles = srcfiles.slice();
     srcfiles.sort((fileA, fileB) => {
       if (fileA.unresolvedSuperclassIDs || fileB.unresolvedSuperclassIDs) {
         // Either or both files have class dependencies across other files, so order
@@ -596,6 +724,25 @@ class PkgCompiler {
     });
 
     // console.log('srcfiles (after sorting):', [for (f of srcfiles) f.name]);
+
+    // Now sort topographically
+    var ts = [];
+    var NONE = {name:'NONE'};
+    for (let fileA of srcfiles) {
+      var deps = this._detectedDependencies[fileA.name];
+      if (deps && deps.length !== 0) {
+        for (let dep of deps) {
+          ts.push([fileA, dep.file]);
+        }
+      } else {
+        ts.push([fileA, NONE]);
+      }
+    }
+    srcfiles = toposort(ts).filter(f => f !== NONE).reverse();
+
+    //console.log('srcfiles (after toposort):', [for (f of srcfiles) f.name]);
+
+    return srcfiles;
   }
 
 

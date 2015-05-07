@@ -20,17 +20,49 @@ class CodeBuffer {
     }
     this.code += linechunk + '\n';
     if (srcloc) {
-      this.map.addMapping({
-        generated: {line: this.line, column: 1 },
-        original: { line: srcloc.start.line, column: srcloc.start.column },
-        source: srcfilename,
-      });
-      this.map.addMapping({
-        generated: {line: this.line, column: linechunk.length },
-        original: { line: srcloc.end.line, column: srcloc.end.column },
-        source: srcfilename,
-      });
+      this.addSrcLocMapping(
+        srcloc,
+        srcfilename,
+        {line: this.line, column: 1 },
+        {line: this.line, column: linechunk.length }
+      );
     }
+  }
+
+
+  appendCode(code, srcloc, srcfilename) {
+    var startLine = this.line;
+    var lines = code.split(/\r?\n/g);
+    this.code += code + '\n';
+    this.line += lines.length + 1;
+    if (srcloc) {
+      this.addSrcLocMapping(
+        srcloc,
+        srcfilename,
+        {line: startLine, column: 1 },
+        {line: this.line, column: lines[lines.length-1].length }
+      );
+    }
+  }
+
+
+  addSrcLocMapping(srcloc, srcfilename, genStart, genEnd) {
+    this.map.addMapping({
+      original:  {
+        line:   srcloc.startLine === undefined ? srcloc.start.line : srcloc.startLine,
+        column: srcloc.startColumn === undefined ? srcloc.start.column : srcloc.startColumn,
+      },
+      generated: genStart,
+      source:    srcfilename || srcloc.filename,
+    });
+    this.map.addMapping({
+      original:  {
+        line:   srcloc.endLine === undefined ? srcloc.end.line : srcloc.endLine,
+        column: srcloc.endColumn === undefined ? srcloc.end.column : srcloc.endColumn,
+      },
+      generated: genEnd,
+      source:    srcfilename || srcloc.filename,
+    });
   }
 
 

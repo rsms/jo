@@ -46,37 +46,31 @@ var Env = Object.create(null, {
 
 // async fsTryDirs1(filename:string, fn:function):[result:any, pkgdir:string, jopath:string]
 function fsTryDirs1(filename, fn) { return new Promise((resolve, reject) => {
-  let dirs = Env.paths
-  let noMatch = {}
-  async.reduce(
-    dirs,
-    noMatch,
-    (memo, jopath, cb) => {
-      let pkgdir = jopath+'/'+filename
-      fn(pkgdir, (err, ret) => {
-        if (err && err.code === 'ENOENT') {
-          cb(null, noMatch)
+  var dirs = Env.paths;
+  var next = function(index) {
+    var jopath = dirs[index++];
+    var pkgdir = jopath+'/'+filename;
+    fn(pkgdir, (err, ret) => {
+      if (err && err.code === 'ENOENT') {
+        if (index === dirs.length) {
+          err = new Error(
+            repr(filename)+
+            ' not found in '+(dirs.length > 1 ? 'any of ' : '')+
+            dirs.map(repr).join(', ')
+          )
+          err.code = 'ENOENT'
+          err.errno = 34
+          err.path = filename
         } else {
-          cb(err, [ret, pkgdir, jopath])
+          return next(index);
         }
-      })
-    },
-    (err, retvals) => {
-      if (retvals === noMatch) {
-        err = new Error(
-          repr(filename)+
-          ' not found in '+(dirs.length > 1 ? 'any of ' : '')+
-          dirs.map(repr).join(', ')
-        )
-        err.code = 'ENOENT'
-        err.errno = 34
-        err.path = filename
       }
       if (err) {
-        reject(err)
+        reject(err);
       } else {
-        resolve(retvals)
+        resolve([ret, pkgdir, jopath]);
       }
-    }
-  )
+    })
+  };
+  next(0);
 })}

@@ -53,6 +53,20 @@ var TargetOptions = _$record("TargetOptions", {
   warningsAsErrors: false, // bool
 });
 
+// Most of these come from
+// https://raw.githubusercontent.com/douglascrockford/JSLint/master/jslint.js
+var globalJSNames = {};
+[ 'Array', 'Boolean', 'Date', 'decodeURI', 'decodeURIComponent',
+  'encodeURI', 'encodeURIComponent', 'Error', 'eval', 'EvalError',
+  'Function', 'isFinite', 'isNaN', 'JSON', 'Map', 'Math', 'Number',
+  'Object', 'parseInt', 'parseFloat', 'Promise', 'Proxy',
+  'RangeError', 'ReferenceError', 'Reflect', 'RegExp', 'Set',
+  'String', 'Symbol', 'SyntaxError', 'System', 'TypeError',
+  'URIError', 'WeakMap', 'WeakSet',
+
+  'undefined', 'arguments',
+].forEach(name => { globalJSNames[name] = 1 });
+
 class Target {
   static create(id:string, mode:int, options:TargetOptions=TargetOptions.default) {
     switch (mode) {
@@ -74,7 +88,12 @@ class Target {
     this.id = id;
     this.mode = mode;
     this.options = options;
-    this.globals = {'this':1, 'undefined':1, 'arguments':1};
+    this.globals = {__proto__:globalJSNames};
+    if (options.globals && options.globals instanceof Array) {
+      for (let globalName of options.globals) {
+        this.globals[globalName] = 1;
+      }
+    }
   }
 
   registerGlobals(globals) {
@@ -103,11 +122,6 @@ class Target {
 
   moduleFilename(pkg:Pkg, depLevel:int) {
     // return null to indicate that the module should not be stored.
-    if (this.options.output && depLevel === 0) {
-      // Assume whatever set "output" made sure there's only one top-level
-      // package. Now, return "output" for that top-level package `pkg`.
-      return this.options.output;
-    }
     let t = this.id + '.' + this.mode
     if (pkg.jopath && pkg.ref) {
       return pkg.jopath + '/pkg/' + t + '/' + pkg.ref + '/index.js'
@@ -146,19 +160,20 @@ class Target {
     return disabledTransforms
   }
 
+  // Allows adding any code to the beginning and/or end of a package's module code
+  //pkgModuleHeader(pkg:Pkg):string {}
+  //pkgModuleFooter(pkg:Pkg):string {}
+
+  // Allows modifying the code of precompiled modules
+  //filterPrecompiledModuleCode(pkg:Pkg, code:string):string {}
+
+  // preMake is called before any packages are built
+  //async preMake(pkgs) {}
 
   // postMake is called after all packages and dependencies have been successfully compiled.
   // The target might choose to perform some kind of post-processing at this stage. Or not.
   // (pkgs:Pkg[])
-  async postMake(pkgs) {
-  }
+  //async postMake(pkgs) {}
 
 }
 
-
-class BrowserTarget extends Target {
-  //
-}
-
-
-class WebkitTarget extends BrowserTarget {}

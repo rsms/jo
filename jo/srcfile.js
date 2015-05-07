@@ -14,7 +14,7 @@ class SrcFile {
   // Returns true if filename might be a source file
   // (filename:string):bool
   static filenameMatches(filename) {
-    return filename.match(/\.js$/);
+    return filename.match(/^[^\.].*\.js$/);
   }
 
   // Takes a list of filenames based in basedir and returns a possibly

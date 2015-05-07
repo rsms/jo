@@ -38,24 +38,30 @@ options: {
 },
 main: async function(opts, args, usage, cb) {
   var sendResult = (err, id) => {
-    let r = {type:"result"}
+    let r = {type:"result"};
     if (id !== undefined) {
       r.id = id;
     }
     if (err) {
-      r.error = err.description || err.stack.split(/\n+/)[0] || String(err)
+      r.error = err.description || (err.stack ? err.stack.split(/\n+/)[0] : String(err));
+      r.diagnostics = SrcError.makeDiagnostics(err);
     }
-    process.send(r)
-  }
-  let onmessage = (msg, cb) => {
+    process.send(r);
+  };
+
+  await RemoteControl(opts.pid, (msg, cb) => {
     if (msg.type === 'runcmd') {
       // console.log('cmd-remotectrl: invoke', process.argv.slice(0,2).concat(msg.args));
-      let f = (err) => { sendResult(err, msg.id); cb(); }
+      let f = (err) => {
+        sendResult(err, msg.id);
+        cb();
+      }
       Mainv(process.argv.slice(0,2).concat(msg.args)).then(f).catch(f);
     } else {
       sendResult('unknown remote message "'+msg.type+'"')
       cb();
     }
-  }
-  await RemoteControl(opts.pid, onmessage)
+  })
+
+  console.log('remote control exited')
 }}

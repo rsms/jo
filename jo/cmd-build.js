@@ -36,14 +36,22 @@ options: {
   o: '<file>        Output filename',
   target: '<target> Generate product for "browser", "browser-webkit" or "nodejs" (default)',
   a: '              Force rebuilding of packages that are already up-to-date',
+  globals: '<names> Comma separated list of custom global JS identifiers',
   dev: '            Build a development version (unoptimized, debug checks, etc)',
   v: '              Print status messages',
   D: '              Print debugging messages, useful for developing jo',
+  work: '       print the name of the temporary work directory and do not delete it when exiting',
 },
 
 main: async function(opts, args, usage, cb) {
   args = Unique(args.filter(arg => arg.trim()))
   // WorkDir.createSync()  // TODO create lazily
+
+  if (opts.work) {
+    console.log('workdir:', WorkDir.path);
+  } else {
+    WorkDir.enableRemoveAtExit();
+  }
 
   var pkgs = []
 
@@ -71,12 +79,20 @@ main: async function(opts, args, usage, cb) {
   let target = Target.create(opts.target || TARGET_NODEJS, targetMode, {
     logger: logger,
     output: opts.o,
+    globals: opts.globals ? opts.globals.split(/[\s ]*,[\s ]*/g) : null,
   })
 
-  // Build packages
+  // Target pre-processing
+  if (target.preMake) {
+    await target.preMake(pkgs)
+  }
+
+  // Build!
   let buildCtx = new BuildCtx(target, logger)
   await Promise.all(pkgs.map(pkg => buildCtx.buildPkg(pkg)))
 
-  // Post processing
-  await target.postMake(pkgs)
+  // Target post-processing
+  if (target.postMake) {
+    await target.postMake(pkgs)
+  }
 }}

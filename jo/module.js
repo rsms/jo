@@ -42,15 +42,39 @@ class PrecompiledModule extends Module {
     super({file:file})
   }
 
-  async copyToIfOutdated(dstFilename) {
-    var dstStat
-    // dstStat = await fs.stat(dstFilename)
-    // this.stat = await fs.stat(this.file)
+  async copyToIfOutdated(dstFilename, pkg:Pkg, target:Target) {
+    var dstStat;
     [dstStat, this.stat] = await Promise.all([dstFilename, this.file].map(f => fs.stat(f)));
-    if (!dstStat || this.stat.mtime > dstStat.mtime) {
-      await fs.mkdirs(path.dirname(dstFilename))
-      await fs.copy(this.file, dstFilename)
+    if (dstStat && this.stat.mtime <= dstStat.mtime) {
+      // up-to-date
+      return;
     }
+
+    await fs.mkdirs(path.dirname(dstFilename));
+
+    var copyPromise;
+    if (target.filterPrecompiledModuleCode) {
+      copyPromise = (async () => {
+        let code = target.filterPrecompiledModuleCode(
+          pkg,
+          await fs.readFile(this.file, {encoding:'utf8'})
+        );
+        await fs.writeFile(dstFilename, code, {encoding:'utf8'});
+      })();
+    } else {
+      copyPromise = fs.copy(this.file, dstFilename);
+    }
+
+    var copyMap = async () => {
+      if (await fs.stat(this.file + '.map')) {
+        await fs.copy(this.file + '.map', dstFilename + '.map');
+      }
+    };
+
+    await Promise.all([
+      copyPromise,
+      copyMap()
+    ]);
   }
 
 

@@ -24,6 +24,15 @@ function sayHello() {
   return "Hello";
 }
 
+async function later() {
+  await evenLater();
+}
+async function evenLater(){}
+
+function main(args) {
+}
+
+
 // class HelloBar extends Bar {
 //   render() {
 //     var A = 123;

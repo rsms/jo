@@ -35,7 +35,7 @@ SrcError.formatSource = function(srcloc, message, errname, caretColor, linesB, l
   if (!indent) indent = '';
   var msg = indent;
   if (srcloc && srcloc.filename) {
-    msg += srcloc.formatFilename(caretColor) + ': '
+    msg += srcloc.formatFilename(caretColor) + ' '
   }
   msg += S.bold(message);
   if (errname) {
@@ -48,8 +48,8 @@ SrcError.formatSource = function(srcloc, message, errname, caretColor, linesB, l
 }
 
 
-SrcError.format = function(err, linesB, linesA) {
-  var srcloc = err.srcloc || SrcLocation({
+function srclocForError(err) {
+  return err.srcloc || SrcLocation({
     filename:    (err.file ? err.file.name : err.filename),
     code:        (err.file ? err.file.code : err.sourceCode),
     range:       [err.index, err.index],
@@ -58,6 +58,11 @@ SrcError.format = function(err, linesB, linesA) {
     endLine:     err.lineNumber,
     endColumn:   err.column-1,
   });
+}
+
+
+SrcError.format = function(err, linesB, linesA) {
+  var srcloc = srclocForError(err);
 
   var message = SrcError.formatSource(
     srcloc,
@@ -91,5 +96,23 @@ SrcError.format = function(err, linesB, linesA) {
   }
 
   return message;
+}
+
+
+SrcError.makeDiagnostics = function(err) {
+  var srcloc;
+  try {
+    srcloc = srclocForError(err);
+  } catch (e) {
+    return [];
+  }
+
+  return [
+    {
+      srcloc:  srcloc,
+      message: err._message || err.message,
+      fixit:   err.fixSuggestion,
+    },
+  ];
 }
 

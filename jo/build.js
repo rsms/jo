@@ -86,7 +86,7 @@ class BuildCtx {
       // Copy module
       let targetFilename = this.target.precompiledModuleFilename(pkg, this.depth);
       if (targetFilename && targetFilename !== pkg.module.file) {
-        pkg.module.copyToIfOutdated(targetFilename);
+        await pkg.module.copyToIfOutdated(targetFilename, pkg, this.target);
       }
 
     } else {
@@ -147,7 +147,7 @@ class BuildCtx {
   }
 
 
-  // buildModule(pkg:Pkg, irModuleFile:string, srcfiles:SrcFile[]):Module
+  // buildModule(pkg:Pkg, srcfiles:SrcFile[]):Module
   async buildModule(pkg, srcfiles) {
     let mod = new Module({ file: this.target.moduleFilename(pkg, this.depth) });
 
@@ -156,7 +156,7 @@ class BuildCtx {
       this.logDebug('compiling module for pkg', this.log.style.boldGreen(pkg.id))
 
       // Compile package to module
-      var compiler = new PkgCompiler(pkg, this.target)
+      var compiler = new PkgCompiler(pkg, mod, this.target)
       var compiled = await compiler.compile(srcfiles)
       mod.code = compiled.code
       mod.map = compiled.map
@@ -199,6 +199,7 @@ class BuildCtx {
     var pkginfo
     try {
       pkginfo = Pkg.parsePkgInfo(mod.code)
+      pkg.pkgInfo = pkginfo;
     } catch (err) {
       this.logWarn('error while loading module code:', err.message)
       return true

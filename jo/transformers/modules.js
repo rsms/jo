@@ -9,6 +9,7 @@ var __DEV__ = true; // FIXME remove when we build ourselves
 //   node:ASTNode                    // the import node
 // }
 import {types as t} from 'babel'
+import {repr} from '../util'
 
 function ImportError(file, node, message, fixSuggestion, related) {
   return SrcError('ImportError', SrcLocation(node, file), message, fixSuggestion, related);
@@ -153,38 +154,12 @@ export var ModuleTransformer = {
   },
 
 
-  post(file) {
-    // Append export statements to the end.
-    if (file.joIsLastFile) {
-      Object.keys(file.joPkg.exports).forEach((name) => {
-        let exp = file.joPkg.exports[name];
-        let memberExpr;
-        if (name === 'default') {
-          file.ast.program.body.push(
-            t.expressionStatement(
-              t.assignmentExpression(
-                '=',
-                t.memberExpression(t.identifier("exports"), t.identifier("__esModule")),
-                t.literal(true)
-              )
-            )
-            // exp.node
-          );
-          // exports["default"]
-          memberExpr = t.memberExpression(t.identifier("exports"), t.literal(name), true);
-        } else {
-          // exports.foo
-          memberExpr = t.memberExpression(t.identifier("exports"), t.identifier(name));
-        }
-        let assignmentExpr = t.assignmentExpression(
-          '=',
-          memberExpr,
-          exp.node
-        );
-        assignmentExpr._joISImplicitExport = true;
-        file.ast.program.body.push(t.expressionStatement(assignmentExpr));
-      });
-    }
-  }
+  // post(file) {
+  //   // Append export statements to the end.
+  //   if (file.joIsLastFile) {
+  //     //file.ast.program.body
+  //     console.log(repr(file.ast));
+  //   }
+  // }
 
 }

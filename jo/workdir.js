@@ -25,6 +25,14 @@ var WorkDir = Object.create(null, {
         if (err) reject(err); else resolve(dirname)
       })
     })}
-  }
+  },
+
+  enableRemoveAtExit: { enumerable: true,
+    value: function() {
+      process.on('exit', () => {
+        try { fsx.removeSync(WorkDir.path); } catch (e) {}
+      });
+    }
+  },
 
 })
