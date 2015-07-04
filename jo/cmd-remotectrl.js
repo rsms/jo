@@ -47,6 +47,9 @@ main: async function(opts, args, usage, cb) {
       r.diagnostics = SrcError.makeDiagnostics(err);
     }
     process.send(r);
+    if (err) {
+      console.error(err.stack || String(err));
+    }
   };
 
   await RemoteControl(opts.pid, (msg, cb) => {

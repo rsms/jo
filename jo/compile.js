@@ -194,7 +194,7 @@ class PkgCompiler {
     }
 
 
-    // Add pkginfo header
+    // Gen pkginfo header
     var runtimeRefPrefixLen = 'babel-runtime/'.length;
     var pkginfo = {
       files:   this.pkg.files,
@@ -209,10 +209,6 @@ class PkgCompiler {
       pkginfo.main = true;
     }
     this.pkg.pkgInfo = pkginfo;
-    codebuf.addLine('//#jopkg'+JSON.stringify(pkginfo));
-    if (this.module.file) {
-      codebuf.addLine('//#sourceMappingURL='+path.basename(this.module.file)+'.map');
-    }
 
     // Add any target header
     if (this.target.pkgModuleHeader) {
@@ -223,6 +219,9 @@ class PkgCompiler {
         });
       }
     }
+
+    // Add pkginfo
+    codebuf.addLine('//#jopkg'+JSON.stringify(pkginfo));
 
     // Add imports
     if (Object.keys(runtimeImps).length !== 0 || Object.keys(importRefs).length !== 0) {
@@ -251,7 +250,7 @@ class PkgCompiler {
     }
 
     // Generate exports
-    this.genExports(srcfiles, codebuf)
+    this.genExports(srcfiles, codebuf);
 
     // Add any target footer
     if (this.target.pkgModuleFooter) {
@@ -261,6 +260,11 @@ class PkgCompiler {
           codebuf.addLine(line);
         });
       }
+    }
+
+    // Source map directive (must be last)
+    if (this.module.file) {
+      codebuf.addLine('//#sourceMappingURL='+path.basename(this.module.file)+'.map');
     }
   }
 

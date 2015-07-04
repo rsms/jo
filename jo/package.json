@@ -8,6 +8,6 @@
     "fs-extra": "^0.16.4",
     "recast": "^0.10.9",
     "source-map": "^0.4.2",
-    "source-map-support": "^0.2.10"
+    "source-map-support": "^0.3.2"
   }
 }

@@ -1,3 +1,5 @@
+import {repr} from './util'
+
 function toposort(edges) {
   return _toposort(uniqueNodes(edges), edges);
 }
@@ -9,14 +11,18 @@ function _toposort(nodes, edges) {
     , i = cursor;
 
   while (i--) {
-    if (!visited[i]) visit(nodes[i], i, [])
+    if (!visited[i]) {
+      visit(nodes[i], i, [])
+    }
   }
 
-  return sorted
+  return sorted;
 
   function visit(node, i, predecessors) {
-    if(predecessors.indexOf(node) >= 0) {
-      throw new Error('Cyclic dependency: '+JSON.stringify(node))
+    if (predecessors.indexOf(node) >= 0) {
+      // throw new Error('Cyclic dependency: '+(node.name || String(node)) +
+      //   ' in ' + repr(sorted.map(n => node.name || node)), 4, false);
+      return;
     }
 
     if (visited[i]) return;

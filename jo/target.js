@@ -1,3 +1,5 @@
+import {Unique} from './util'
+
 const TARGET_BROWSER        = 'browser'
 const TARGET_BROWSER_WEBKIT = 'browser-webkit'
 const TARGET_NODEJS         = 'nodejs'
@@ -119,6 +121,11 @@ class Target {
     return 'ignore';  // common|ignore|system|umd
   }
 
+  moduleForPackage(pkg:Pkg, depLevel:int) {
+    // Override this to return an alternate module for a package
+    return new Module({ file: this.moduleFilename(pkg, depLevel) });
+  }
+
 
   moduleFilename(pkg:Pkg, depLevel:int) {
     // return null to indicate that the module should not be stored.
@@ -160,15 +167,49 @@ class Target {
     return disabledTransforms
   }
 
-  // Allows adding any code to the beginning and/or end of a package's module code
-  //pkgModuleHeader(pkg:Pkg):string {}
-  //pkgModuleFooter(pkg:Pkg):string {}
+
+  resolveRequiredRuntimeModules(pkg:Pkg) {
+    var runtimeModules = [];
+    var visited = {};
+    var visit = function(pkg) {
+      if (pkg.dir in visited) return;
+      visited[pkg.dir] = true;
+      let runtimeMods = pkg.pkgInfo ? pkg.pkgInfo['babel-runtime'] : null;
+      if (runtimeMods) {
+        runtimeModules = runtimeModules.concat(runtimeMods);
+      }
+      for (let depPkg of pkg.deps) {
+        visit(depPkg);
+      }
+    };
+    visit(pkg);
+    return Unique(runtimeModules);
+  }
+
+
+  runtimeHelperSourceFilename(ref) {
+    var basedir = Env.JOROOT + '/jo/node_modules/babel-runtime/';
+    if (ref === 'regenerator') {
+      return basedir + 'regenerator/runtime.js';
+    } else {
+      return basedir + ref + '.js';
+    }
+  }
 
   // Allows modifying the code of precompiled modules
   //filterPrecompiledModuleCode(pkg:Pkg, code:string):string {}
 
   // preMake is called before any packages are built
   //async preMake(pkgs) {}
+
+  // Allows adding any code to the beginning and/or end of a package's module code
+  //pkgModuleHeader(pkg:Pkg):string {}
+  //pkgModuleFooter(pkg:Pkg):string {}
+
+  // postCompile iscalled after a package has been compiled, but before it's written
+  // to disk. The package has a valid and complete Module at this time. You might modify
+  // the module code and/or source map.
+  // postCompile(pkg:Pkg) {}
 
   // postMake is called after all packages and dependencies have been successfully compiled.
   // The target might choose to perform some kind of post-processing at this stage. Or not.

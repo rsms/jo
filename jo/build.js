@@ -97,7 +97,7 @@ class BuildCtx {
       var srcfiles = await pkg.loadSrcFiles();
 
       // build module
-      pkg.module = await this.buildModule(pkg, srcfiles);
+      await this.buildModule(pkg, srcfiles); // Note: sets pkg.module
     }
 
     // Resolve any dependencies and register with pkg
@@ -149,7 +149,8 @@ class BuildCtx {
 
   // buildModule(pkg:Pkg, srcfiles:SrcFile[]):Module
   async buildModule(pkg, srcfiles) {
-    let mod = new Module({ file: this.target.moduleFilename(pkg, this.depth) });
+    let mod = this.target.moduleForPackage(pkg, this.depth);
+    pkg.module = mod;
 
     // Is the module outdated?
     if (!mod.file || await this.isModuleOutdated(pkg, mod, srcfiles)) {
@@ -158,10 +159,15 @@ class BuildCtx {
       // Compile package to module
       var compiler = new PkgCompiler(pkg, mod, this.target)
       var compiled = await compiler.compile(srcfiles)
-      mod.code = compiled.code
-      mod.map = compiled.map
+      mod.code = compiled.code;
+      mod.map = compiled.map;
+      mod.stat = null;  // Clear stat (which might relate to old module code)
 
-      // Write intermediate code
+      if (this.target.postCompile) {
+        this.target.postCompile(pkg);
+      }
+
+      // Write code
       if (mod.file) {
         this.logDebug(
           'write module', this.log.style.boldMagenta(mod.file),
@@ -169,9 +175,7 @@ class BuildCtx {
         )
         await WriteCode(mod.code, mod.map, mod.file)
       }
-
-      // Clear stat (which might relate to old module code)
-      mod.stat = null
+      
     } else {
       this.logDebug('reusing up-to-date module for pkg', this.log.style.boldGreen(pkg.id))
     }
@@ -236,14 +240,23 @@ class BuildCtx {
 
 
 async function WriteCode(code, sourcemap, outfile) {
-  // Write module
   await fs.mkdirs(path.dirname(outfile))
-
-  // Source map
   // B.line('# sourceMappingURL=' + this.pkg + '.js.map'),
-  await Promise.all([
-    fs.writeFile(outfile, code, {encoding:'utf8'}),
-    fs.writeFile(outfile + '.map', JSON.stringify(sourcemap), {encoding:'utf8'})
-  ])
+  if (sourcemap.inline || sourcemap.excluded) {
+    let sourceMapReplacement = '';
+    if (!sourcemap.excluded) {
+      sourceMapReplacement = '//#sourceMappingURL=data:application/json;charset:utf-8;base64,' +
+                             new Buffer(sourcemap.toString()).toString('base64');
+    }
+    code = code.replace(/\n\/\/#sourceMappingURL=.+\n/m, '\n'+sourceMapReplacement+'\n');
+    await fs.writeFile(outfile, code, {encoding:'utf8'});
+  } else {
+    await Promise.all([
+      fs.writeFile(outfile, code, {encoding:'utf8'}),
+      fs.writeFile(outfile + '.map', JSON.stringify(sourcemap), {encoding:'utf8'})
+    ]);
+  }
+  // TODO: Write "atomically" by writing to tempfile, then fs.link(tempfile, putfile) and finally
+  //       fs.unlink(tempfile).
 }
 

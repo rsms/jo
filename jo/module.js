@@ -7,10 +7,10 @@
 
 class Module {
   constructor({file=null, stat=null, code=null, map=null}) {
-    this.file = file
-    this.stat = stat
-    this.code = code
-    this.map = map
+    this.file = file ? file : null;
+    this.stat = stat;
+    this.code = code;
+    this.map = map;
   }
 
 
@@ -26,9 +26,9 @@ class Module {
       try {
         m.map = JSON.parse(await fs.readFile(m.file + '.map', {encoding:'utf8'}))
       } catch (err) {
-        // Ignore non-existent source maps for precompiled Modules
-        if (!(m instanceof PrecompiledModule) || err.code !== 'ENOENT') {
-          throw err
+        // Ignore non-existent source maps
+        if (err.code !== 'ENOENT') {
+          throw err;
         }
       }
     }

@@ -1,4 +1,3 @@
-import {Unique} from './util'
 
 class BrowserTarget extends Target {
   constructor(id, mode, options) {
@@ -11,7 +10,8 @@ class BrowserTarget extends Target {
       'clearInterval', 'clearTimeout', 'document', 'event', 'FormData',
       'frames', 'history', 'Image', 'localStorage', 'location', 'name',
       'navigator', 'Option', 'parent', 'screen', 'sessionStorage',
-      'setInterval', 'setTimeout', 'Storage', 'window', 'XMLHttpRequest'
+      'setInterval', 'setTimeout', 'Storage', 'window', 'XMLHttpRequest',
+      'Notification',
     ]);
 
     this.modules = [];
@@ -90,7 +90,6 @@ class BrowserTarget extends Target {
     var additionalModuleURLs = [];
 
     // Find any runtime helpers
-    // "babel-runtime/helpers/class-call-check"
     var runtimeModules = this.resolveRequiredRuntimeModules(pkg);
     if (runtimeModules.length !== 0) {
       let runtimeFilename = '.jopkg.babel-runtime.js';
@@ -111,25 +110,6 @@ class BrowserTarget extends Target {
     await fs.writeFile(productFilename, code, {encoding:'utf8'});
 
     // console.log('htmlTemplate:', code);
-  }
-
-
-  resolveRequiredRuntimeModules(pkg:Pkg) {
-    var runtimeModules = [];
-    var visited = {};
-    var visit = function(pkg) {
-      if (pkg.dir in visited) return;
-      visited[pkg.dir] = true;
-      let runtimeMods = pkg.pkgInfo ? pkg.pkgInfo['babel-runtime'] : null;
-      if (runtimeMods) {
-        runtimeModules = runtimeModules.concat(runtimeMods);
-      }
-      for (let depPkg of pkg.deps) {
-        visit(depPkg);
-      }
-    };
-    visit(pkg);
-    return Unique(runtimeModules);
   }
 
 
@@ -154,7 +134,7 @@ class BrowserTarget extends Target {
     // core-js must be first if it's part of filenames
     refs = refs.slice();
     refs.sort((a, b) => a === 'core-js' ? -1 : b === 'core-js' ? 1 : 0);
-    var filenames = refs.map(ref => this.runtimeHelperFilename(ref));
+    var filenames = refs.map(ref => this.runtimeHelperSourceFilename(ref));
 
     // TODO: only rebuild if needed
     // let stats = await Promise.all([outFilename].concat(filenames).map(fn => fs.stat(fn)));
@@ -172,16 +152,6 @@ class BrowserTarget extends Target {
     });
 
     return mtimes.reduce((m, v) => Math.max(m, v), 0).toString(36)
-  }
-
-
-  runtimeHelperFilename(ref) {
-    var basedir = Env.JOROOT + '/jo/node_modules/babel-runtime/';
-    if (ref === 'regenerator') {
-      return basedir + 'regenerator/runtime.js';
-    } else {
-      return basedir + ref + '.js';
-    }
   }
 
 
