@@ -62,7 +62,7 @@ foo/primate.js
 class Primate {}
 ```
 
-Which is would compile to something like this:
+Which would compile to something like this:
 
 ```js
 // import _classCallCheck and _inherits from babel-runtime/helpers
@@ -138,10 +138,10 @@ The final code contains only a single import:
 ```
 $ jo build -o=-
 ...
-  , _a_js$thing = _$import("some/thing")
-  , _b_js$A     = _a_js$thing.A
-  , _c_js$A     = _a_js$thing.A
-  , _c_js$B     = _a_js$thing.B
+  , _b_js$thing = _$import("some/thing")
+  , _a_js$A     = _b_js$thing.A
+  , _c_js$A     = _b_js$thing.A
+  , _c_js$B     = _b_js$thing.B
 ...
 ```
 
@@ -416,6 +416,7 @@ function main() {
 ```
 $ go build -target=browser
 ```
+
 
 foo/index.html
 ```html
