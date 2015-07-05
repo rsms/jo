@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 set -e
 
 pushd "$(dirname "$0")" >/dev/null
@@ -31,7 +31,11 @@ for pkg in . util transformers remotectrl asyncfs; do
     # echo "check mtime $srcf"
     if [ "$srcf" -nt "$dstf" ]; then
       pushd "$JOLIBDIR/.build" >/dev/null
-      out=$JOLIBDIR/$pkg/index.js
+      if [ "$pkg" == "." ]; then
+        out=$JOLIBDIR/index.js
+      else
+        out=$JOLIBDIR/$pkg/index.js
+      fi
       echo "$0: building $pkg"
       # echo "pwd: '$(pwd)'"
       # echo "in:  '../../../jo/$pkg/*.js'"
@@ -48,8 +52,13 @@ for pkg in . util transformers remotectrl asyncfs; do
       if [ "$pkg" == "." ]; then
         tmpout=$JOLIBDIR/$pkg/.tmp.index.js
         mv "$out" "$tmpout"
-        echo "//# sourceMappingURL=index.js.map" > "$out"
-        echo "require('source-map-support').install();" >> "$out"
+        echo -n "require('source-map-support').install({" >> "$out"
+        echo -n   "retrieveSourceMap: function(source) {" >> "$out"
+        echo -n     "if (source.indexOf('/.jo/') !== -1) {" >> "$out"
+        echo -n       "return { url: source, map: require('fs').readFileSync(source+'.map', 'utf8') };" >> "$out"
+        echo -n     "}" >> "$out"
+        echo -n   "}" >> "$out"
+        echo "});" >> "$out"
         cat "$tmpout" >> "$out"
         echo '' >> "$out"  # make sure there's a line break at the end
         echo "main(process.argv);" >> "$out"

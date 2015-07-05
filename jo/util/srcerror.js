@@ -61,6 +61,17 @@ function srclocForError(err) {
 }
 
 
+function styleCodeQuotes(s) {
+  var S = TermStyle.stdout;
+  return S.enabled ? S.bold(s.replace(/`([^`]*)`/g, (_, m) => S.cyan(m) ))
+                   : s;
+}
+
+function formatSuggestion(suggestion:string, indent:string) {
+  return indent + styleCodeQuotes(suggestion.replace(/\n/mg, indent)) + '\n';
+}
+
+
 SrcError.format = function(err, linesB, linesA) {
   var srcloc = srclocForError(err);
 
@@ -73,11 +84,9 @@ SrcError.format = function(err, linesB, linesA) {
     linesA
   );
 
-  if (err.fixSuggestion) {
-    var S = TermStyle.stdout;
-    message += '\n  Suggestion: ' + S.bold(err.fixSuggestion.replace(/`([^`]*)`/g, function(_,m) {
-      return S.enabled ? S.cyan(m) : '`'+m+'`';
-    }))+'\n';
+  let suggestion = err.suggestion || err.fixSuggestion;
+  if (suggestion) {
+    message += formatSuggestion(suggestion, '\n  ');
   }
 
   if (err.related) {
@@ -91,6 +100,10 @@ SrcError.format = function(err, linesB, linesA) {
         linesB,
         linesA,
         hasFirstSrcLocMsg ? '    ' : null);
+      let suggestion = related.suggestion || related.fixSuggestion;
+      if (suggestion) {
+        message += formatSuggestion(suggestion, '\n    ');
+      }
       hasFirstSrcLocMsg = true;
     });
   }

@@ -29,7 +29,7 @@ Options:
   and file names are provided, the file name derives from the first file name
   mentioned, such as f1 for '{{prog}} f1.js f2.js'; with no files provided
   ('{{prog}}'), the output file name is the base name of the containing
-  directory.
+  directory. If "-" is specified as the output file, output is written to stdout.
 
 `,
 options: {
@@ -88,7 +88,7 @@ main: async function(opts, args, usage, cb) {
   }
 
   // Build!
-  let buildCtx = new BuildCtx(target, logger)
+  let buildCtx = new BuildCtx(target, logger, {forceRebuild:opts.a})
   await Promise.all(pkgs.map(pkg => buildCtx.buildPkg(pkg)))
 
   // Target post-processing

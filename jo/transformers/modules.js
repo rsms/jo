@@ -9,7 +9,7 @@ var __DEV__ = true; // FIXME remove when we build ourselves
 //   node:ASTNode                    // the import node
 // }
 import {types as t} from 'babel'
-import {repr} from '../util'
+import {repr, JSIdentifier, SrcError, SrcLocation} from '../util'
 
 function ImportError(file, node, message, fixSuggestion, related) {
   return SrcError('ImportError', SrcLocation(node, file), message, fixSuggestion, related);

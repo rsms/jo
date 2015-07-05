@@ -2,11 +2,12 @@ import sourceMap from 'source-map'
 import path from 'path'
 
 class CodeBuffer {
-  constructor() {
+  constructor(sourceDir:string) {
     this.code = '';
     this.line = 0;
     this.column = 0;
     this.map = new sourceMap.SourceMapGenerator({ file: "out" });
+    this.sourceDir = (sourceDir ? sourceDir + '/' : '');
     this._nextAnonID = 0;
   }
 
@@ -47,13 +48,14 @@ class CodeBuffer {
 
 
   addSrcLocMapping(srcloc, srcfilename, genStart, genEnd) {
+    srcfilename = this.sourceDir + path.basename(srcfilename || srcloc.filename);
     this.map.addMapping({
       original:  {
         line:   srcloc.startLine === undefined ? srcloc.start.line : srcloc.startLine,
         column: srcloc.startColumn === undefined ? srcloc.start.column : srcloc.startColumn,
       },
       generated: genStart,
-      source:    srcfilename || srcloc.filename,
+      source:    srcfilename,
     });
     this.map.addMapping({
       original:  {
@@ -61,7 +63,7 @@ class CodeBuffer {
         column: srcloc.endColumn === undefined ? srcloc.end.column : srcloc.endColumn,
       },
       generated: genEnd,
-      source:    srcfilename || srcloc.filename,
+      source:    srcfilename,
     });
   }
 
@@ -70,7 +72,7 @@ class CodeBuffer {
     var consumer = new sourceMap.SourceMapConsumer(map);
 
     for (let i = 0, L = map.sources.length; i !== L; i++) {
-      let filename = map.sources[i];
+      let filename = this.sourceDir + map.sources[i];
       this.map._sources.add(filename);
       this.map.setSourceContent(filename, map.sourcesContent[i]);
     }
@@ -81,7 +83,8 @@ class CodeBuffer {
         generatedColumn: mapping.generatedColumn,
         originalLine: mapping.originalLine,
         originalColumn: mapping.originalColumn,
-        source: path.basename(mapping.source), // must match map._sources.add(filename)
+        source: this.sourceDir + path.basename(mapping.source),
+          //^ must match map._sources.add(filename)
       })
     });
 

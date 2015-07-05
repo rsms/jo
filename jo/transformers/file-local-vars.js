@@ -1,4 +1,5 @@
 import {types as t} from 'babel'
+import {SrcLocation, SrcError} from '../util'
 
 
 function ReferenceError(file, node, message, related) {
@@ -111,16 +112,28 @@ export var FileLocalVarsTransformer = {
           file.joPkg.definedIDs = {};
         } else if(file.joPkg.definedIDs[name]) {
           let existingDecl = file.joPkg.definedIDs[name];
-          let bindingKind =
-            (binding.kind === 'hoisted') ? 'function' : binding.kind;
-          let otherBindingKind =
-            (existingDecl.binding.kind === 'hoisted') ? 'function' : existingDecl.binding.kind;
+
+          let bindingKind = binding.kind;
+          let otherBindingKind = existingDecl.binding.kind;
+          let node = binding.node;
+          let otherNode = existingDecl.binding.node;
+
+          if (bindingKind === 'hoisted') {
+            bindingKind = 'function';
+            node = node.id;
+          }
+
+          if (otherBindingKind === 'hoisted') {
+            otherBindingKind = 'function';
+            otherNode = otherNode.id;
+          }
+
           throw ReferenceError(
             file.jofile,
-            binding.node,
+            node,
             `duplicate identifier in ${bindingKind} declaration`,
             [{ message: `${otherBindingKind} declared here`,
-              srcloc: SrcLocation(existingDecl.binding.node, existingDecl.file)
+              srcloc: SrcLocation(otherNode, existingDecl.file)
             }]
           );
         }
@@ -143,14 +156,14 @@ export var FileLocalVarsTransformer = {
 }
 
 
-function dumpScopeBindings(scope, depth=0) {
-  for (var k in scope.bindings) {
-    console.log(
-      '                                                                      '.substr(0,depth*2)+
-      k, '=>', repr(scope.bindings[k],0)
-    );
-  }
-  if (scope.parent) {
-    dumpScopeBindings(scope.parent, depth+1);
-  }
-}
+// function dumpScopeBindings(scope, depth=0) {
+//   for (var k in scope.bindings) {
+//     console.log(
+//       '                                                                      '.substr(0,depth*2)+
+//       k, '=>', repr(scope.bindings[k],0)
+//     );
+//   }
+//   if (scope.parent) {
+//     dumpScopeBindings(scope.parent, depth+1);
+//   }
+// }

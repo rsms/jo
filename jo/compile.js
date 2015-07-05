@@ -2,7 +2,8 @@
 var recast = require('recast');
 var B = recast.types.builders;
 
-import {JSIdentifier, SrcError, SrcLocation, repr, Unique} from './util'
+var path = require('path');
+import {JSIdentifier, SrcError, SrcLocation, repr, Unique, LevenshteinDistance} from './util'
 
 import * as babel from 'babel'
 import BabelFile from 'babel/lib/babel/transformation/file';
@@ -117,11 +118,12 @@ function CyclicReferenceError(pkg, name, fileA, fileB, deps, onlyClasses:bool) {
 
 class PkgCompiler {
 
-  constructor(pkg:Pkg, mod:Module, target:Target) {
+  constructor(pkg:Pkg, mod:Module, target:Target, depLevel:int) {
     this.pkg = pkg
     this.module = mod
     this.target = target
     this.log = this.target.log
+    this.depLevel = depLevel;
     this._nextAnonID = 0;
   }
 
@@ -142,7 +144,7 @@ class PkgCompiler {
     }
 
     // Code buffer we'll use to build module code
-    var codebuf = new CodeBuffer;
+    var codebuf = new CodeBuffer(path.resolve(this.pkg.dir));
 
     // Add header
     this.genHeader(srcfiles, codebuf);
@@ -212,9 +214,9 @@ class PkgCompiler {
 
     // Add any target header
     if (this.target.pkgModuleHeader) {
-      let targetHeaderCode = this.target.pkgModuleHeader(this.pkg).trim();
+      let targetHeaderCode = this.target.pkgModuleHeader(this.pkg, this.depLevel);
       if (targetHeaderCode) {
-        targetHeaderCode.split(/\r?\n/g).forEach(line => {
+        targetHeaderCode.trim().split(/\r?\n/g).forEach(line => {
           codebuf.addLine(line);
         });
       }
@@ -254,9 +256,9 @@ class PkgCompiler {
 
     // Add any target footer
     if (this.target.pkgModuleFooter) {
-      let s = this.target.pkgModuleFooter(this.pkg).trim();
+      let s = this.target.pkgModuleFooter(this.pkg, this.depLevel);
       if (s) {
-        s.split(/\r?\n/g).forEach(line => {
+        s.trim().split(/\r?\n/g).forEach(line => {
           codebuf.addLine(line);
         });
       }
@@ -563,20 +565,54 @@ class PkgCompiler {
       if (file.unresolvedIDs && Object.keys(file.unresolvedIDs).length !== 0) {
         if (!errs) errs = [];
         for (let name of Object.keys(file.unresolvedIDs)) {
-          errs.push({
+          let err = {
             message: `unresolvable identifier "${name}"`,
-            srcloc:  SrcLocation(file.unresolvedIDs[name].node, file)
-          });
+            srcloc:  SrcLocation(file.unresolvedIDs[name].node, file),
+          }
+          let suggestions = this.findIDSuggestions(srcfiles, name);
+          if (suggestions.length !== 0) {
+            err.suggestion = this.formatIDSuggestions(suggestions);
+          }
+          errs.push(err);
         }
       }
     });
     if (errs) {
       if (errs.length === 1) {
-        throw SrcError('ReferenceError', errs[0].srcloc, errs[0].message);
+        throw SrcError('ReferenceError', errs[0].srcloc, errs[0].message, errs[0].suggestion);
       } else {
         throw SrcError('ReferenceError', null, 'unresolvable identifiers', null, errs);
       }
     }
+  }
+
+
+  findIDSuggestions(srcfiles:SrcFile[], name:string, depth=0) {
+    var sv = [];
+    var nameLowerCase = name.toLowerCase();
+    for (let srcfile of srcfiles) {
+      for (let k in srcfile.definedIDs) {
+        let id = srcfile.definedIDs[k];
+        if (id.kind === 'module' || id.kind === 'uid' || !id.node.loc) {
+          continue;
+        }
+        let d = (nameLowerCase === k.toLowerCase()) ? 0 : LevenshteinDistance(name, k);
+        if (d <= 2) {
+          sv.push({d:d, name:k, srcloc: SrcLocation(id.node, srcfile)});
+        }
+      }
+    }
+    // sort from shortest edit distance to longest
+    sv.sort((a,b) => a.d - b.d);
+    return sv;
+  }
+
+
+  formatIDSuggestions(suggestions) {
+    var s = 'Did you mean' + (suggestions.length > 1 ? ':\n  ' : ' ') + suggestions.map(s =>
+        TermStyle.stdout.boldCyan(s.name) + ' defined in ' + s.srcloc.formatFilename('green') )
+      .join('\n  ');
+    return s;
   }
 
 

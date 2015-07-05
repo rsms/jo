@@ -121,6 +121,10 @@ class Target {
     return 'ignore';  // common|ignore|system|umd
   }
 
+  get pkgDirName() {
+    return this.id + '.' + this.mode;
+  }
+
   moduleForPackage(pkg:Pkg, depLevel:int) {
     // Override this to return an alternate module for a package
     return new Module({ file: this.moduleFilename(pkg, depLevel) });
@@ -129,13 +133,12 @@ class Target {
 
   moduleFilename(pkg:Pkg, depLevel:int) {
     // return null to indicate that the module should not be stored.
-    let t = this.id + '.' + this.mode
     if (pkg.jopath && pkg.ref) {
-      return pkg.jopath + '/pkg/' + t + '/' + pkg.ref + '/index.js'
+      return pkg.jopath + '/pkg/' + this.pkgDirName + '/' + pkg.ref + '/index.js'
     }
     return WorkDir.path + '/' +
-      ( pkg.ref ? 'pkg/' + t + '/' + pkg.ref :
-                  'pkgdir/' + t + pkg.dir ) + '.js'
+      ( pkg.ref ? 'pkg/' + this.pkgDirName + '/' + pkg.ref :
+                  'pkgdir/' + this.pkgDirName + pkg.dir ) + '.js'
   }
 
 
@@ -203,13 +206,13 @@ class Target {
   //async preMake(pkgs) {}
 
   // Allows adding any code to the beginning and/or end of a package's module code
-  //pkgModuleHeader(pkg:Pkg):string {}
-  //pkgModuleFooter(pkg:Pkg):string {}
+  //pkgModuleHeader(pkg:Pkg, depLevel:int):string {}
+  //pkgModuleFooter(pkg:Pkg, depLevel:int):string {}
 
   // postCompile iscalled after a package has been compiled, but before it's written
   // to disk. The package has a valid and complete Module at this time. You might modify
   // the module code and/or source map.
-  // postCompile(pkg:Pkg) {}
+  // postCompile(pkg:Pkg, depLevel:int) {}
 
   // postMake is called after all packages and dependencies have been successfully compiled.
   // The target might choose to perform some kind of post-processing at this stage. Or not.

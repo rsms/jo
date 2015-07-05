@@ -170,11 +170,11 @@ class BrowserTarget extends Target {
   }
 
 
-  pkgModuleHeader(pkg:Pkg) {
+  pkgModuleHeader(pkg:Pkg, depLevel:int) {
     return this._moduleHeader(pkg.ref, pkg.hasMainFunc);
   }
 
-  pkgModuleFooter(pkg:Pkg) {
+  pkgModuleFooter(pkg:Pkg, depLevel:int) {
     return this._moduleFooter(pkg.hasMainFunc);
   }
 
