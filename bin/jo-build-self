@@ -3,11 +3,11 @@ set -e
 
 pushd "$(dirname "$0")" >/dev/null
 JOBINDIR=$(pwd)
-JOLIBDIR=$JOBINDIR/.jo
+JOLIBDIR=$JOBINDIR/.build/jo
 JOROOT=$(dirname "$JOBINDIR")
 popd >/dev/null
 
-export NODE_PATH="${JOROOT}/jo/node_modules"
+export NODE_PATH="${JOROOT}/node_modules"
 
 if [ "$1" == "--force" ]; then
   rm -rf "$JOLIBDIR"
@@ -15,15 +15,13 @@ if [ "$1" == "--force" ]; then
 elif [ "$1" == "--help" ] || [ "$1" == "-h" ]; then
   echo "Usage: $0 [--force]" >&2
   exit 0
-else
-  mkdir -p "$JOLIBDIR/visitors"
 fi
 
 # Really messy paths here: only way to make sourcemap paths work properly with babel & node
 
-pushd "${JOROOT}" >/dev/null
+pushd "${JOROOT}/src" >/dev/null
 mkdir -p "$JOLIBDIR/.build"
-for pkg in . util transformers remotectrl asyncfs; do
+for pkg in . util transformers remotectrl asyncfs jo; do
   dstf=$JOLIBDIR/$pkg/index.js
   mkdir -p "$JOLIBDIR/$pkg"
 
@@ -38,7 +36,7 @@ for pkg in . util transformers remotectrl asyncfs; do
       fi
       echo "$0: building $pkg"
       # echo "pwd: '$(pwd)'"
-      # echo "in:  '../../../jo/$pkg/*.js'"
+      # echo "in:  '../../../../src/jo/$pkg/*.js'"
       # echo "out: '$out'"
       "${NODE_PATH}/babel/bin/babel/index.js" \
         --source-maps \
@@ -46,15 +44,15 @@ for pkg in . util transformers remotectrl asyncfs; do
         --experimental \
         --optional es6.symbols,runtime \
         --out-file "$out" \
-        "../../../jo/$pkg"/*.js
+        "../../../../src/jo/$pkg"/*.js
         # --compact true
 
-      if [ "$pkg" == "." ]; then
+      if [ "$pkg" == "jo" ]; then
         tmpout=$JOLIBDIR/$pkg/.tmp.index.js
         mv "$out" "$tmpout"
         echo -n "require('source-map-support').install({" >> "$out"
         echo -n   "retrieveSourceMap: function(source) {" >> "$out"
-        echo -n     "if (source.indexOf('/.jo/') !== -1) {" >> "$out"
+        echo -n     "if (source.indexOf('/.build/jo/') !== -1) {" >> "$out"
         echo -n       "return { url: source, map: require('fs').readFileSync(source+'.map', 'utf8') };" >> "$out"
         echo -n     "}" >> "$out"
         echo -n   "}" >> "$out"

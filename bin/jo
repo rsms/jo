@@ -1,12 +1,14 @@
-#!/bin/sh
-set -e
-
-pushd "$(dirname "$0")" >/dev/null
-JOBINDIR=$(pwd)
-JOLIBDIR=$JOBINDIR/.jo
-JOROOT=$(dirname "$JOBINDIR")
-popd >/dev/null
-
-export NODE_PATH="${JOROOT}/jo/node_modules"
-
-exec -a "$0" node --harmony --stack-trace-limit=25 "$JOLIBDIR/index.js" "$@"
+#!/usr/bin/env node --harmony
+Array.prototype.splice.apply(module.paths,[0,0,(process.env.JOROOT||"/Users/rasmus/src2/jo")+"/node_modules",(process.env.JOROOT||"/Users/rasmus/src2/jo")+"/pkg/nodejs.release"]);
+require('source-map-support').install();
+//#jopkg{"files":["main.js"],"imports":["jo","jo/util"],"exports":[],"babel-runtime":["helpers/sliced-to-array"],"version":"ibr9b4ae","main":true}
+var _$import = function(ref) { var m = require(ref); return m && m.__esModule ? m["default"] || m : m;}
+, _$importWC = function(ref) { var m = require(ref); return m && m.__esModule ? m : {"default":m};}
+  , _slicedToArray = _$import("babel-runtime/helpers/sliced-to-array")
+  , _main_js$Mainv = _$import("jo").Mainv
+  , _$$0 = _$import("jo/util")
+  , _main_js$SrcError = _$$0.SrcError
+  , _main_js$parseopt = _$$0.parseopt;
+"use strict";function main(argv){_main_js$Mainv(argv)["catch"](function(err){if(!_main_js$SrcError.canFormat(err)){var _parseopt$prog=_main_js$parseopt.prog(process.argv);var _parseopt$prog2=_slicedToArray(_parseopt$prog, 2);var prog=_parseopt$prog2[0];var _=_parseopt$prog2[1];}process.exit(1);});}
+main(process.argv);
+//#sourceMappingURL=data:application/json;charset:utf-8;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VzIjpbIi9Vc2Vycy9yYXNtdXMvc3JjMi9qby9zcmMvam8vam8vbWFpbi5qcyJdLCJuYW1lcyI6W10sIm1hcHBpbmdzIjoiOzs7Ozs7O0NBQUEsd0NBQXdCOztDQUN4QixvQ0FBMEM7Q0FBMUMscUNBQTBDO2FBRTFDLFNBQVMsSUFBSSxDQUFDLElBQUksQ0FBRSxDQUNsQixjQUFLLENBQUMsSUFBSSxDQUFDLFNBQU0sQ0FBQyxTQUFBLEdBQUcsQ0FBSSxDQUN2QixJQUFJLGlCQUFRLENBQUMsU0FBUyxDQUFDLEdBQUcsQ0FBQyxDQUVwQixvQkFDVyxpQkFBUSxDQUFDLElBQUksQ0FBQyxPQUFPLENBQUMsSUFBSSxDQUFDLDJEQUF0QyxJQUFJLHdCQUFFLENBQUMscUJBRWIsQUFDRCxPQUFPLENBQUMsSUFBSSxHQUFHLENBQUMsQ0FDakIsQ0FBQyxDQUFDLENBQ0oiLCJmaWxlIjoib3V0Iiwic291cmNlc0NvbnRlbnQiOlsiaW1wb3J0IHtNYWludn0gZnJvbSAnam8nXG5pbXBvcnQge1NyY0Vycm9yLCBwYXJzZW9wdH0gZnJvbSAnam8vdXRpbCdcblxuZnVuY3Rpb24gbWFpbihhcmd2KSB7XG4gIE1haW52KGFyZ3YpLmNhdGNoKGVyciA9PiB7XG4gICAgaWYgKFNyY0Vycm9yLmNhbkZvcm1hdChlcnIpKSB7XG4gICAgICBjb25zb2xlLmVycm9yKFNyY0Vycm9yLmZvcm1hdChlcnIpKTtcbiAgICB9IGVsc2Uge1xuICAgICAgbGV0IFtwcm9nLCBfXSA9IHBhcnNlb3B0LnByb2cocHJvY2Vzcy5hcmd2KVxuICAgICAgY29uc29sZS5lcnJvcihwcm9nKyc6JywgZXJyLnN0YWNrIHx8IGVycik7XG4gICAgfVxuICAgIHByb2Nlc3MuZXhpdCgxKTtcbiAgfSk7XG59XG4iXX0=

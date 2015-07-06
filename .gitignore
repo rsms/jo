@@ -1,2 +1,5 @@
 /pkg
+/bin/*-g
+/bin/.build
+/node_modules
 *.jopkg.*
