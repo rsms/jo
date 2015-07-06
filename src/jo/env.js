@@ -13,7 +13,7 @@ var Env = Object.create(null, {
   },
 
   JOROOT: {
-    enumerable: true,                        // __dirname={JOROOT}/bin/.build/jo (non self-build)
+    enumerable: true,
     value: process.env.JOROOT ||
           (process.env.JOROOT = path.dirname(path.dirname(path.dirname(__dirname))))
   },
@@ -49,7 +49,7 @@ var Env = Object.create(null, {
 // async fsTryDirs1():[result:any, pkgdir:string, jopath:string]
 function fsTryDirs1(filename, basedirSuffix, fn) { return new Promise((resolve, reject) => {
   var paths = Env.paths;
-  var dirs = basedirSuffix ? paths.map(s => s + '/' + basedirSuffix) : paths;
+  var dirs = basedirSuffix ? paths.map(s => s + '/' + basedirSuffix).concat(Env.JOPATH) : paths;
   var next = function(index) {
     var basedir = dirs[index];
     var jopath = paths[index++];
