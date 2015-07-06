@@ -157,7 +157,9 @@ class Target {
     }
     var TargetType = Targets[id.toLowerCase()];
     if (!TargetType) {
-      throw new Error(`unknown target identifier "${id}"`)
+      throw new Error(
+        `unknown target identifier "${id}" (available targets: ${Object.keys(Targets)})`
+      )
     }
     return new TargetType(id, mode, options);
   }
@@ -275,7 +277,7 @@ class Target {
 
 
   runtimeHelperSourceFilename(ref) {
-    var basedir = Env.JOROOT + '/jo/node_modules/babel-runtime/';
+    var basedir = Env.JOROOT + '/node_modules/babel-runtime/';
     if (ref === 'regenerator') {
       return basedir + 'regenerator/runtime.js';
     } else {
