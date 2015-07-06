@@ -6,6 +6,30 @@ Jo is a Go-style JavaScript ES6 compiler and packager, based on Babel.
 - Compilation and compatibility fills provided by well-tested Babel
 - Separation of target code generation allows building both Nodejs code and web browser code, for optimal performance and linting
 
+Jo comes precompiled and can be used from source:
+
+```
+$ ./bin/jo help
+```
+
+Or installed via [npm](https://www.npmjs.com/package/jo):
+```
+$ npm install -g jo
+$ jo help
+```
+
+For hacking on Jo, Jo builds itself, like a true compiler:
+```
+$ ./bin/jo-g env
+-bash: bin/jo-g: No such file or directory
+$ ./bin/jo build -dev -v jo/jo
+building source package jo/jo
+...
+$ ./bin/jo-g env
+JOPATH=""
+JOROOT="/Users/rasmus/src2/jo"
+```
+
 
 ## Automatic package-internal vs exported symbols
 
