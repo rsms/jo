@@ -117,7 +117,6 @@ class NodeJSTarget extends Target {
           this.programDstFile = './' + path.resolve(pkg.dir).split('/').pop();
         }
       }
-      console.log('this.programDstFile:', this.programDstFile);
 
       // Attempt relative path for same joroot
       let dstDirAbs = path.dirname(path.resolve(this.programDstFile));
@@ -204,27 +203,12 @@ class NodeJSTarget extends Target {
       return;
     }
 
-    var outfile = this.options.output;
     var fileMode = 511; // 0777
-
-    // Program destination
-    if (this.options.output) {
-      outfile = this.options.output;
-    } else if (pkg.jopath) {
-      let progname = pkg.ref.split('/').pop();
-      outfile = pkg.jopath + '/bin/' + progname + (this.isDevMode ? '-g' : '');
-    } else {
-      if (pkg.ref) {
-        outfile = './' + pkg.ref;
-      } else {
-        outfile = './' + path.resolve(pkg.dir).split('/').pop();
-      }
-    }
     if (!pkg.hasMainFunc) {
       fileMode = 438; // 0666
     }
 
-    let writeToStdout = this.options.output && outfile === '-';
+    let writeToStdout = this.options.output && this.programDstFile === '-';
 
     // Add main function call
     let code = pkg.module.code;
@@ -242,9 +226,9 @@ class NodeJSTarget extends Target {
     //   ...
     // }
 
-    await writeCode(code, pkg.module.map, outfile, writeToStdout);
+    await writeCode(code, pkg.module.map, this.programDstFile, writeToStdout);
     if (!writeToStdout) {
-      await fs.chmod(outfile, fileMode);
+      await fs.chmod(this.programDstFile, fileMode);
     }
   }
 
