@@ -235,7 +235,7 @@ class Target {
       transforms = transforms.concat([
         'utility.removeConsole',       // `console...` -> ``
         'utility.removeDebugger',      // `debugger` -> ``
-        'utility.inlineExpressions',   // `5 * 1024` -> `5120`, `"a" === "a"` -> `true`, etc
+        //Note: 'utility.inlineExpressions' is causes regex to disappear (babel 4.7.16)
         'utility.deadCodeElimination', // `if (0) { foo(); } else { bar(); }` -> `bar();`
       ]);
     } //else { // dev

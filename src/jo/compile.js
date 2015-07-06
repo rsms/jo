@@ -399,7 +399,8 @@ class PkgCompiler {
       code:              true,     // output JavaScript code
       ast:               false,    // output AST
       experimental:      true,     // enable things like ES7 features
-      compact:           this.target.mode === TARGET_MODE_RELEASE,   // "minify"
+      compact:           false,//this.target.mode === TARGET_MODE_RELEASE,   // "minify"
+                               //^ [BUG] true: broken in babel 4.7.16 (concats "yield" and "new")
       comments:          this.target.mode === TARGET_MODE_DEV,  // include comments in output
       returnUsedHelpers: false,    // return information on what helpers are needed/was added
       modules:           'ignore',
