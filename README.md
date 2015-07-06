@@ -323,9 +323,9 @@ Example of various import statements:
 import "some/thing"
 import {Component} from "some/thing"
 import react from "./my-react"
-import {A, B} from "foo"
-import aa, {A,B as bee} from "foo/bar"
-import ay from ""
+import {Anne, Bob} from "friends"
+import foes, {Zorro, Baltazhar as BMan} from "foes"
+import * as cats from "lolcats"
 ```
 
 
