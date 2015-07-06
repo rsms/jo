@@ -1,15 +1,13 @@
-//#jopkg{"files":["class-hierarcy.js","file-local-vars.js","modules.js"],"imports":["../util","npmjs.com/babel"],"exports":["ClassHierarchyTransformer","ImportError","ModuleTransformer","ReferenceError","FileLocalVarsTransformer"],"babel-runtime":["core-js"],"version":"ibs7sh7a"}
-var _$import = function(ref) { var m = require(ref); return m && m.__esModule ? m["default"] || m : m;}
-, _$importWC = function(ref) { var m = require(ref); return m && m.__esModule ? m : {"default":m};}
-  , _core = _$import("babel-runtime/core-js")
-  , _$$0 = _$import("../util")
+//#jopkg{"files":["class-hierarcy.js","file-local-vars.js","modules.js"],"imports":["../util","npmjs.com/babel"],"exports":["ClassHierarchyTransformer","ReferenceError","FileLocalVarsTransformer","ImportError","ModuleTransformer"],"babel-runtime":["core-js"],"version":"ibshhjez"}
+var _core = __$irt("babel-runtime/core-js")
+  , _$$0 = __$i(require("../util"))
   , _modules_js$repr = _$$0.repr
   , _modules_js$JSIdentifier = _$$0.JSIdentifier
   , _modules_js$SrcError = _$$0.SrcError
   , _modules_js$SrcLocation = _$$0.SrcLocation
   , _file_local_vars_js$SrcLocation = _$$0.SrcLocation
   , _file_local_vars_js$SrcError = _$$0.SrcError
-  , _$$1 = _$import("npmjs.com/babel")
+  , _$$1 = __$i(require("babel"))
   , _modules_js$t = _$$1.types
   , _file_local_vars_js$t = _$$1.types;
 "use strict";
@@ -309,8 +307,8 @@ var ClassHierarchyTransformer = {
 
 };
 exports.ClassHierarchyTransformer = ClassHierarchyTransformer;
-exports.ImportError = ImportError;
-exports.ModuleTransformer = ModuleTransformer;
 exports.ReferenceError = ReferenceError;
 exports.FileLocalVarsTransformer = FileLocalVarsTransformer;
+exports.ImportError = ImportError;
+exports.ModuleTransformer = ModuleTransformer;
 //#sourceMappingURL=index.js.map

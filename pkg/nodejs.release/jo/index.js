@@ -1,44 +1,43 @@
-//#jopkg{"files":["__DEV__.js","build.js","cmd-build.js","cmd-env.js","cmd-remotectrl.js","codebuf.js","compile.js","env.js","jo.js","logger.js","module.js","pkg.js","preprocessor.js","srcfile.js","target.js","target_browser.js","target_nodejs.js","tokenizer.js","toposort.js","workdir.js","writecode.js"],"imports":["./asyncfs","path","os","./util","npmjs.com/source-map","npmjs.com/babel","npmjs.com/babel/lib/babel/transformation/file","npmjs.com/babel/lib/babel/transformation/transformer","npmjs.com/babel/lib/babel/generation","./transformers","./remotectrl"],"exports":["BuildCtx","BuildCmd","EnvCmd","RemoteControlCmd","CodeBuffer","Env","ExportError","ReferenceError","CyclicReferenceError","PkgCompiler","Mainv","Commands","Logger","Module","PrecompiledModule","Pkg","BuiltInPkg","NPMPkg","TokenEditor","Preprocessor","SrcFile","TARGET_BROWSER","TARGET_BROWSER_WEBKIT","TARGET_NODEJS","TARGET_MODE_DEV","TARGET_MODE_RELEASE","Targets","TargetOptions","GLOBAL_STD","GLOBAL_DEPRECATED","GLOBAL_UNSAFE","GLOBAL_EXPERIMENTAL","Target","BrowserTarget","NodeJSTarget","Tokenizer","WorkDir"],"babel-runtime":["helpers/async-to-generator","core-js","helpers/class-call-check","helpers/create-class","helpers/inherits","helpers/get","helpers/sliced-to-array","helpers/define-property","helpers/interop-require-wildcard"],"version":"ibs7sgnn"}
-var _$import = function(ref) { var m = require(ref); return m && m.__esModule ? m["default"] || m : m;}
-, _$importWC = function(ref) { var m = require(ref); return m && m.__esModule ? m : {"default":m};}
-  , _asyncToGenerator = _$import("babel-runtime/helpers/async-to-generator")
-  , _core = _$import("babel-runtime/core-js")
-  , _classCallCheck = _$import("babel-runtime/helpers/class-call-check")
-  , _createClass = _$import("babel-runtime/helpers/create-class")
-  , _inherits = _$import("babel-runtime/helpers/inherits")
-  , _get = _$import("babel-runtime/helpers/get")
-  , _slicedToArray = _$import("babel-runtime/helpers/sliced-to-array")
-  , _defineProperty = _$import("babel-runtime/helpers/define-property")
-  , _interopRequireWildcard = _$import("babel-runtime/helpers/interop-require-wildcard")
-  , _writecode_js$fs = _$import("./asyncfs")
+//#jopkg{"files":["__DEV__.js","build.js","cmd-build.js","cmd-env.js","cmd-remotectrl.js","codebuf.js","compile.js","env.js","jo.js","logger.js","module.js","pkg.js","preprocessor.js","srcfile.js","target.js","target_browser.js","target_nodejs.js","tokenizer.js","toposort.js","workdir.js","writecode.js"],"imports":["asyncfs","path","os","./util","npmjs.com/source-map","npmjs.com/babel","npmjs.com/babel/lib/babel/transformation/file","npmjs.com/babel/lib/babel/transformation/transformer","npmjs.com/babel/lib/babel/generation","./transformers","./remotectrl"],"exports":["BuildCtx","EnvCmd","BuildCmd","RemoteControlCmd","CodeBuffer","ExportError","ReferenceError","CyclicReferenceError","PkgCompiler","Env","Mainv","Commands","Logger","Module","PrecompiledModule","Pkg","BuiltInPkg","NPMPkg","TokenEditor","Preprocessor","SrcFile","TARGET_BROWSER","TARGET_BROWSER_WEBKIT","TARGET_NODEJS","TARGET_MODE_DEV","TARGET_MODE_RELEASE","Targets","TargetOptions","GLOBAL_STD","GLOBAL_DEPRECATED","GLOBAL_UNSAFE","GLOBAL_EXPERIMENTAL","Target","BrowserTarget","NodeJSTarget","Tokenizer","WorkDir"],"babel-runtime":["helpers/async-to-generator","core-js","helpers/class-call-check","helpers/create-class","helpers/inherits","helpers/get","helpers/sliced-to-array","helpers/define-property","helpers/interop-require-wildcard"],"version":"ibshhiu5"}
+var _asyncToGenerator = __$irt("babel-runtime/helpers/async-to-generator")
+  , _core = __$irt("babel-runtime/core-js")
+  , _classCallCheck = __$irt("babel-runtime/helpers/class-call-check")
+  , _createClass = __$irt("babel-runtime/helpers/create-class")
+  , _inherits = __$irt("babel-runtime/helpers/inherits")
+  , _get = __$irt("babel-runtime/helpers/get")
+  , _slicedToArray = __$irt("babel-runtime/helpers/sliced-to-array")
+  , _defineProperty = __$irt("babel-runtime/helpers/define-property")
+  , _interopRequireWildcard = __$irt("babel-runtime/helpers/interop-require-wildcard")
+  , _writecode_js$fs = __$im(require,"asyncfs")
   , _workdir_js$fs = _writecode_js$fs
   , _module_js$fs = _writecode_js$fs
   , _env_js$fs = _writecode_js$fs
   , _target_nodejs_js$fs = _writecode_js$fs
   , _target_browser_js$fs = _writecode_js$fs
   , _preprocessor_js$fs = _writecode_js$fs
-  , _compile_js$fs = _writecode_js$fs
   , _pkg_js$fs = _writecode_js$fs
+  , _compile_js$fs = _writecode_js$fs
   , _build_js$fs = _writecode_js$fs
   , _cmd_build_js$fs = _writecode_js$fs
-  , _writecode_js$path = _$import("path")
+  , _writecode_js$path = __$i(require("path"))
   , _module_js$path = _writecode_js$path
   , _env_js$path = _writecode_js$path
   , _target_nodejs_js$path = _writecode_js$path
   , _target_browser_js$path = _writecode_js$path
+  , _pkg_js$path = _writecode_js$path
   , _codebuf_js$path = _writecode_js$path
   , _compile_js$path = _writecode_js$path
-  , _pkg_js$path = _writecode_js$path
   , _build_js$path = _writecode_js$path
   , _cmd_build_js$path = _writecode_js$path
   , _jo_js$path = _writecode_js$path
-  , _workdir_js$os = _$import("os")
-  , _$$0 = _$import("./util")
+  , _workdir_js$os = __$i(require("os"))
+  , _$$0 = __$i(require("./util"))
   , _env_js$repr = _$$0.repr
   , _target_js$Unique = _$$0.Unique
   , _toposort_js$repr = _$$0.repr
   , _preprocessor_js$repr = _$$0.repr
   , _logger_js$TermStyle = _$$0.TermStyle
+  , _pkg_js$SrcError = _$$0.SrcError
   , _compile_js$JSIdentifier = _$$0.JSIdentifier
   , _compile_js$SrcError = _$$0.SrcError
   , _compile_js$SrcErrors = _$$0.SrcErrors
@@ -48,22 +47,21 @@ var _$import = function(ref) { var m = require(ref); return m && m.__esModule ? 
   , _compile_js$LevenshteinDistance = _$$0.LevenshteinDistance
   , _compile_js$TermStyle = _$$0.TermStyle
   , _cmd_remotectrl_js$SrcError = _$$0.SrcError
-  , _pkg_js$SrcError = _$$0.SrcError
   , _build_js$SrcLocation = _$$0.SrcLocation
   , _build_js$TermStyle = _$$0.TermStyle
   , _cmd_build_js$Unique = _$$0.Unique
   , _jo_js$ParseOpt = _$$0.ParseOpt
   , _jo_js$SrcError = _$$0.SrcError
-  , _codebuf_js$sourceMap = _$import("npmjs.com/source-map")
-  , _compile_js$babel = _$importWC("npmjs.com/babel")
-  , _compile_js$BabelFile = _$import("npmjs.com/babel/lib/babel/transformation/file")
-  , _compile_js$Transformer = _$import("npmjs.com/babel/lib/babel/transformation/transformer")
-  , _compile_js$BabelGen = _$import("npmjs.com/babel/lib/babel/generation")
-  , _$$1 = _$import("./transformers")
+  , _codebuf_js$sourceMap = __$i(require("source-map"))
+  , _compile_js$babel = __$iw(require("babel"))
+  , _compile_js$BabelFile = __$i(require("babel/lib/babel/transformation/file"))
+  , _compile_js$Transformer = __$i(require("babel/lib/babel/transformation/transformer"))
+  , _compile_js$BabelGen = __$i(require("babel/lib/babel/generation"))
+  , _$$1 = __$i(require("./transformers"))
   , _compile_js$ModuleTransformer = _$$1.ModuleTransformer
   , _compile_js$FileLocalVarsTransformer = _$$1.FileLocalVarsTransformer
   , _compile_js$ClassHierarchyTransformer = _$$1.ClassHierarchyTransformer
-  , _cmd_remotectrl_js$RemoteControl = _$import("./remotectrl").RemoteControl;
+  , _cmd_remotectrl_js$RemoteControl = __$i(require("./remotectrl")).RemoteControl;
 "use strict";
 
 var writeCode = _asyncToGenerator(function* (code, sourcemap, outfile) {
@@ -766,67 +764,63 @@ var NodeJSTarget = (function (_Target) {
         return _get(_core.Object.getPrototypeOf(NodeJSTarget.prototype), "transforms", this).call(this, transforms).concat(["asyncToGenerator"]);
       })
     },
+    programDstFile: {
+      value: function programDstFile(pkg) {
+        if (this._programDstFile === undefined || this._programDstFile.pkg !== pkg) {
+          var s;
+          if (this.options.output) {
+            s = this.options.output;
+          } else if (pkg.jopath) {
+            var progname = pkg.ref.split("/").pop();
+            s = pkg.jopath + "/bin/" + progname + (this.isDevMode ? "-g" : "");
+          } else {
+            if (pkg.ref) {
+              s = "./" + pkg.ref;
+            } else {
+              s = "./" + _target_nodejs_js$path.resolve(pkg.dir).split("/").pop();
+            }
+          }
+          this._programDstFile = { pkg: pkg, v: s };
+        }
+        return this._programDstFile.v;
+      }
+    },
     pkgModuleHeader: {
       value: function pkgModuleHeader(pkg, depLevel) {
-        var isMainProgram = depLevel === 0 && pkg.hasMainFunc;
+        if (depLevel === 0 && pkg.hasMainFunc) {
+          return this.programBootCode(pkg);
+        }
+      }
+    },
+    programBootCode: {
+      value: function programBootCode(pkg) {
+        if (this._programBootCode && this._programBootCode.pkg === pkg) {
+          return this._programBootCode.v;
+        }
 
-        var runtimeModules = this.resolveRequiredRuntimeModules(pkg);
-        var externalModulePaths = [];
+        var nodeArgs = " --harmony";
+        if (this.isDevMode) {
+          nodeArgs += " --stack-trace-limit=25";
+        }
+        var shebang = "#!/usr/bin/env node" + nodeArgs + "\n";
 
         var bakedJOROOT = undefined;
 
-        if (isMainProgram) {
-          if (this.options.output) {
-            this.programDstFile = this.options.output;
-          } else if (pkg.jopath) {
-            var progname = pkg.ref.split("/").pop();
-            this.programDstFile = pkg.jopath + "/bin/" + progname + (this.isDevMode ? "-g" : "");
-          } else {
-            if (pkg.ref) {
-              this.programDstFile = "./" + pkg.ref;
-            } else {
-              this.programDstFile = "./" + _target_nodejs_js$path.resolve(pkg.dir).split("/").pop();
-            }
-          }
-
-          var dstDirAbs = _target_nodejs_js$path.dirname(_target_nodejs_js$path.resolve(this.programDstFile));
-          if (dstDirAbs.indexOf(Env.JOROOT) === 0) {
-            bakedJOROOT = "__dirname+" + JSON.stringify(_target_nodejs_js$path.relative(dstDirAbs, Env.JOROOT)).replace(/^"/, "\"/");
-          }
-        }
-
-        if (!bakedJOROOT) {
+        var dstDirAbs = _target_nodejs_js$path.dirname(_target_nodejs_js$path.resolve(this.programDstFile(pkg)));
+        if (dstDirAbs.indexOf(Env.JOROOT) === 0) {
+          bakedJOROOT = "__dirname+" + JSON.stringify(_target_nodejs_js$path.relative(dstDirAbs, Env.JOROOT)).replace(/^"/, "\"/");
+        } else {
           bakedJOROOT = JSON.stringify(Env.JOROOT);
         }
 
-        var header = "";
+        var joRootJS = "require(\"path\")." + (bakedJOROOT === "__dirname+\"/..\"" ? "dirname(__dirname)" : "resolve(" + bakedJOROOT + ")");
 
-        if (isMainProgram) {
-          var nodeArgs = " --harmony";
-          if (this.isDevMode) {
-            nodeArgs += " --stack-trace-limit=25";
-          }
-          header += "#!/usr/bin/env node" + nodeArgs + "\n";
+        var code = "\nrequire(\"source-map-support\").install();\nvar __$fex=require(\"fs\").existsSync\n,__$p\n,__$lpkg=function(q,ref){\n  var i,d,v;\n  if(!__$p){\n    d=" + JSON.stringify("/pkg/" + this.pkgDirName + "/") + ";\n    __$p=[(process.env.JOROOT||" + joRootJS + ")+d];\n    if(v=process.env.JOPATH){\n      v=v.split(\":\");\n      for(i in v){\n        if(v[i])__$p.push(v[i]+d);\n      }\n    }\n  }\n  for(i in __$p){\n    d=__$p[i]+ref+\"/index.js\";\n    if(__$fex(d)){\n      return q(d);\n    }\n  }\n  return q(ref);\n}\n,__$i=global.__$i=function(m){return m && m.__esModule ? (m[\"default\"] || m) : m; }\n,__$iw=global.__$iw=function(m){return m && m.__esModule ? m : {\"default\":m}; };\nglobal.__$im=function(q,r){return __$i(__$lpkg(q,r));};\nglobal.__$irt=function(r){return __$i(require(r));};\nglobal.__$imw=function(q,r){return __$iw(__$lpkg(q,r));};\n    ";
 
-          header += "var _$JOROOT=(process.env.JOROOT||require(\"path\")." + (bakedJOROOT === "__dirname+\"/..\"" ? "dirname(__dirname)" : "resolve(" + bakedJOROOT + ")") + ");";
+        code = shebang + (this.isDevMode ? code.trim() : code.replace(/[ \t]*\r?\n[ \t]*/mg, ""));
 
-          if (runtimeModules.length !== 0 || isMainProgram) {
-            externalModulePaths.push("_$JOROOT+\"/pkg/npm\"");
-          }
-
-          if (pkg.pkgInfo.imports.length !== 0) {
-            externalModulePaths.push("_$JOROOT+" + JSON.stringify(this.pkgDirName).replace(/^"/, "\"/pkg/"));
-          }
-
-          if (externalModulePaths.length !== 0) {
-            var s = "[0,0," + externalModulePaths.join(",") + "]";
-            header += "Array.prototype.splice.apply(module.paths," + s + ");\n";
-          }
-
-          header += "require('source-map-support').install();\n";
-        }
-
-        return header;
+        this._programBootCode = { pkg: pkg, v: code };
+        return code;
       }
     },
     postMake: {
@@ -842,7 +836,8 @@ var NodeJSTarget = (function (_Target) {
           fileMode = 438;
         }
 
-        var writeToStdout = this.options.output && this.programDstFile === "-";
+        var programDstFile = this.programDstFile(pkg);
+        var writeToStdout = this.options.output && programDstFile === "-";
 
         var code = pkg.module.code;
         var p = code.lastIndexOf("\n//#sourceMappingURL=");
@@ -855,9 +850,9 @@ var NodeJSTarget = (function (_Target) {
 
         pkg.module.map.inline = true;
 
-        yield writeCode(code, pkg.module.map, this.programDstFile, writeToStdout);
+        yield writeCode(code, pkg.module.map, programDstFile, writeToStdout);
         if (!writeToStdout) {
-          yield _target_nodejs_js$fs.chmod(this.programDstFile, fileMode);
+          yield _target_nodejs_js$fs.chmod(programDstFile, fileMode);
         }
       })
     }
@@ -1764,8 +1759,272 @@ Logger.WARN = 1;
 Logger.ERROR = 0;
 "use strict";
 
+var SrcFile = (function () {
+  function SrcFile() {
+    _classCallCheck(this, SrcFile);
+  }
+
+  _createClass(SrcFile, null, {
+    filenameMatches: {
+      value: function filenameMatches(filename) {
+        return filename.match(/^[^\.].*\.js$/);
+      }
+    }
+  });
+
+  return SrcFile;
+})();
+"use strict";
+
+var npmRefPrefix = "npmjs.com/";
+
+var Pkg = (function () {
+  function Pkg(_ref) {
+    var dir = _ref.dir;
+    var ref = _ref.ref;
+    var jopath = _ref.jopath;
+    var files = _ref.files;
+
+    _classCallCheck(this, Pkg);
+
+    this.dir = dir;
+    this.ref = ref;
+    this.jopath = jopath;
+    this.files = files;
+    this.imports = {};
+    this.exports = {};
+    this.module = null;
+    this.deps = [];
+    this.pkgInfo = null;
+  }
+
+  _createClass(Pkg, {
+    id: {
+      get: function () {
+        return this.ref || this.dir;
+      }
+    },
+    hasMainFunc: {
+      get: function () {
+        return !!this.mainFunc || this.pkgInfo && this.pkgInfo.main;
+      }
+    },
+    resolveOutputFile: {
+      value: _asyncToGenerator(function* (output) {
+        var st = yield _pkg_js$fs.stat(output);
+        if (st && st.isDirectory()) {
+          return _pkg_js$path.basename(this.id) + ".js";
+        }
+        return output;
+      })
+    },
+    loadSrcFiles: {
+      value: function loadSrcFiles() {
+        var _this = this;
+
+        return _core.Promise.all(this.files.map(_asyncToGenerator(function* (fn) {
+          var filename = _this.dir + "/" + fn;
+          var st = yield _pkg_js$fs.stat(filename);
+          var type = _pkg_js$path.extname(fn).substr(1).toLowerCase();
+          return ({
+              dir: _this.dir,
+              name: fn,
+              relpath: fn,
+              st: st,
+              type: type,
+              pkg: _this }
+          );
+        })));
+      }
+    },
+    pkgFromRef: {
+      value: _asyncToGenerator(function* (ref) {
+        var importedAt = arguments[1] === undefined ? null : arguments[1];
+        var target = arguments[2] === undefined ? null : arguments[2];
+
+        var parentPkg = this;
+        var pkgdir;
+
+        if (ref[0] === ".") {
+          pkgdir = _pkg_js$path.normalize(parentPkg.dir + "/" + ref);
+
+          if (parentPkg.ref) {
+            ref = _pkg_js$path.normalize(parentPkg.ref + "/" + ref);
+            if (ref[0] === ".") {
+              throw _pkg_js$SrcError("ImportError", importedAt, "recursive dependency; trying to import parent package from child package");
+            }
+          }
+        }
+
+        var pkg = undefined,
+            importError = undefined,
+            files = [];
+
+        if (ref[0] === ".") {
+          try {
+            files = (yield _pkg_js$fs.readdir(pkgdir)).filter(SrcFile.filenameMatches);
+            pkg = new Pkg({ ref: ref, dir: pkgdir, files: files, jopath: parentPkg.jopath });
+          } catch (e) {
+            if (e.name === "TypeError") {
+              throw e;
+            }
+            importError = e;
+          }
+        } else if (NPMPkg.refIsNPM(ref)) {
+          return new NPMPkg(NPMPkg.stripNPMRefPrefix(ref));
+        } else {
+          if (target && target.builtInModuleRefs[ref]) {
+            return new BuiltInPkg(ref);
+          }
+          try {
+            var _ref = yield Pkg._envReadRefSrcDir(ref);
+
+            var _ref2 = _slicedToArray(_ref, 3);
+
+            var _files = _ref2[0];
+            var _pkgdir = _ref2[1];
+            var jopath = _ref2[2];
+
+            files = _files.filter(SrcFile.filenameMatches);
+            pkg = new Pkg({ ref: ref, dir: _pkgdir, files: files, jopath: parentPkg.jopath });
+          } catch (e) {
+            if (e.name === "TypeError") {
+              throw e;
+            }
+            importError = e;
+          }
+        }
+
+        if (!importError && files.length === 0) {
+          throw _pkg_js$SrcError("PkgError", null, "no source files found in package \"" + pkg.id + "\"", null, [{ message: "imported here", srcloc: importedAt }]);
+        } else if (importError) {
+          throw _pkg_js$SrcError("ImportError", importedAt, importError.message);
+        }
+
+        return pkg;
+      })
+    }
+  }, {
+    parsePkgInfo: {
+      value: function parsePkgInfo(code) {
+        var jopkgStmtPrefix = "//#jopkg";
+        var end,
+            begin = code.indexOf(jopkgStmtPrefix);
+        if (begin !== -1) {
+          begin += jopkgStmtPrefix.length;
+          end = code.indexOf("\n", begin);
+        }
+        if (begin === -1 || end === -1) {
+          throw new Error("missing jopkg statement");
+        }
+        return JSON.parse(code.substring(begin, end));
+      }
+    },
+    _envReadRefSrcDir: {
+      value: _asyncToGenerator(function* (ref) {
+        return yield Env.readdir(ref, "src");
+      })
+    },
+    fromRef: {
+      value: _asyncToGenerator(function* (ref) {
+        var files = undefined,
+            pkg = undefined;
+        if (ref[0] === "." || ref[0] === "/") {
+          files = (yield _pkg_js$fs.readdir(ref)).filter(SrcFile.filenameMatches);
+          pkg = new Pkg({ ref: null, dir: ref, files: files, jopath: null });
+        } else {
+          var _ref = yield Pkg._envReadRefSrcDir(ref);
+
+          var _ref2 = _slicedToArray(_ref, 3);
+
+          var _files = _ref2[0];
+          var pkgdir = _ref2[1];
+          var jopath = _ref2[2];
+
+          files = _files.filter(SrcFile.filenameMatches);
+          pkg = new Pkg({ ref: ref, dir: pkgdir, files: files, jopath: jopath });
+        }
+        if (files.length === 0) {
+          throw "no source files found in package \"" + pkg.id + "\"";
+        }
+        return pkg;
+      })
+    },
+    fromFiles: {
+      value: _asyncToGenerator(function* (files) {
+        var _iteratorNormalCompletion = true;
+        var _didIteratorError = false;
+        var _iteratorError = undefined;
+
+        try {
+          for (var _iterator = _core.$for.getIterator(files), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+            var f = _step.value;
+
+            if (!SrcFile.filenameMatches(f)) {
+              throw new Error("unexpected file type \"" + f + "\"");
+            }
+          }
+        } catch (err) {
+          _didIteratorError = true;
+          _iteratorError = err;
+        } finally {
+          try {
+            if (!_iteratorNormalCompletion && _iterator["return"]) {
+              _iterator["return"]();
+            }
+          } finally {
+            if (_didIteratorError) {
+              throw _iteratorError;
+            }
+          }
+        }
+
+        var pkgdir = _pkg_js$path.dirname(files[0]);
+        return new Pkg({ ref: null, dir: pkgdir, files: files, jopath: null });
+      })
+    }
+  });
+
+  return Pkg;
+})();
+
+var BuiltInPkg = (function (_Pkg) {
+  function BuiltInPkg(ref) {
+    _classCallCheck(this, BuiltInPkg);
+
+    _get(_core.Object.getPrototypeOf(BuiltInPkg.prototype), "constructor", this).call(this, { ref: ref });
+  }
+
+  _inherits(BuiltInPkg, _Pkg);
+
+  return BuiltInPkg;
+})(Pkg);
+
+BuiltInPkg.prototype.isBuiltIn = true;
+
+var NPMPkg = (function (_Pkg2) {
+  function NPMPkg(ref) {
+    _classCallCheck(this, NPMPkg);
+
+    _get(_core.Object.getPrototypeOf(NPMPkg.prototype), "constructor", this).call(this, { ref: ref });
+  }
+
+  _inherits(NPMPkg, _Pkg2);
+
+  return NPMPkg;
+})(Pkg);
+
+NPMPkg.prototype.isNPM = true;
+NPMPkg.refIsNPM = function (ref) {
+  return ref.length > npmRefPrefix.length && ref.substr(0, npmRefPrefix.length) === npmRefPrefix;
+};
+NPMPkg.stripNPMRefPrefix = function (ref) {
+  return ref.substr(npmRefPrefix.length);
+};
+"use strict";
+
 var CodeBuffer = (function () {
-  function CodeBuffer(sourceDir) {
+  function CodeBuffer(sourceDir, target) {
     _classCallCheck(this, CodeBuffer);
 
     this.code = "";
@@ -1773,13 +2032,19 @@ var CodeBuffer = (function () {
     this.column = 0;
     this.map = new _codebuf_js$sourceMap.SourceMapGenerator({ file: "out" });
     this.sourceDir = sourceDir ? sourceDir + "/" : "";
+    this.target = target;
     this._nextAnonID = 0;
   }
 
   _createClass(CodeBuffer, {
+    lineStart: {
+      get: function () {
+        Object.defineProperty(this, "lineStart", { value: "  , " });
+        return "var ";
+      }
+    },
     addLine: {
       value: function addLine(linechunk, srcfilename, srcloc) {
-        ++this.line;
         {
           if (linechunk.indexOf("\n") !== -1) {
             throw new Error("unexpected linebreak in linechunk");
@@ -1789,12 +2054,14 @@ var CodeBuffer = (function () {
         if (srcloc) {
           this.addSrcLocMapping(srcloc, srcfilename, { line: this.line, column: 1 }, { line: this.line, column: linechunk.length });
         }
+        ++this.line;
       }
     },
     appendCode: {
       value: function appendCode(code, srcloc, srcfilename) {
         var startLine = this.line;
-        var lines = code.split(/\r?\n/g);
+        code = code.trim();
+        var lines = code.split(/\r?\n/);
         this.code += code + "\n";
         this.line += lines.length + 1;
         if (srcloc) {
@@ -1841,7 +2108,7 @@ var CodeBuffer = (function () {
         });
 
         this.code += code + "\n";
-        this.line += code.split("\n").length + 1;
+        this.line += code.split(/\r?\n/).length;
       }
     },
     addRuntimeImports: {
@@ -1853,7 +2120,7 @@ var CodeBuffer = (function () {
 
           var spec = imp.specifiers[0];
           if (spec.id.name === "default") {
-            this.addLine("  , " + spec.name.name + " = " + this.genRequireExpr(ref) + (isLast && i === runtimeRefs.length - 1 ? ";" : ""));
+            this.addLine(this.lineStart + spec.name.name + " = __$irt(" + JSON.stringify(ref) + ")" + (isLast && i === runtimeRefs.length - 1 ? ";" : ""));
           } else {
             throw new Error("unexpected runtime helper import: importing member, not default");
           }
@@ -1893,7 +2160,7 @@ var CodeBuffer = (function () {
           names.push(this.addImport(defaultImp.imp, this.genRequireExpr(ref), defaultImp.spec, isLastImp && imps.length === 1));
         } else {
           defaultIDName = this.anonIDName();
-          this.addLine("  , " + defaultIDName + " = " + this.genRequireExpr(ref), imps[0].srcfile.name, imps[0].source.loc);
+          this.addLine(this.lineStart + defaultIDName + " = " + this.genRequireExpr(ref), imps[0].srcfile.name, imps[0].source.loc);
         }
 
         var specs,
@@ -2032,23 +2299,34 @@ var CodeBuffer = (function () {
       value: function addImport(imp, impExprCode, spec, isLast) {
         var close = isLast ? ";" : "";
         if (spec["default"]) {
-          this.addLine("  , " + spec.name.name + " = " + impExprCode + close, imp.srcfile.name, imp.loc);
+          this.addLine(this.lineStart + spec.name.name + " = " + impExprCode + close, imp.srcfile.name, imp.loc);
           return "default";
         } else if (spec.type === "ImportBatchSpecifier") {
           var idname = spec.name._origName || spec.name.name;
-
-          this.addLine("  , " + spec.name.name + " = _$importWC(" + JSON.stringify(imp.source.value) + ")" + close, imp.srcfile.name, imp.loc);
+          if (impExprCode.substr(0, 5) === "__$i(") {
+            impExprCode = "__$iw(" + impExprCode.substr(5);
+          } else {
+            impExprCode = "__$imw(" + impExprCode.substr(6);
+          }
+          this.addLine(this.lineStart + spec.name.name + " = " + impExprCode + close, imp.srcfile.name, imp.loc);
           return idname;
         } else {
           var idname = spec.id._origName || spec.id.name;
-          this.addLine("  , " + spec.name.name + " = " + impExprCode + "." + idname + close, imp.srcfile.name, imp.loc);
+          this.addLine(this.lineStart + spec.name.name + " = " + impExprCode + "." + idname + close, imp.srcfile.name, imp.loc);
           return idname;
         }
       }
     },
     genRequireExpr: {
       value: function genRequireExpr(ref) {
-        return "_$import(\"" + ref.replace(/"/g, "\\\"") + "\")";
+        var m = undefined;
+        if (NPMPkg.refIsNPM(ref)) {
+          return "__$i(require(" + JSON.stringify(NPMPkg.stripNPMRefPrefix(ref)) + "))";
+        } else if (ref[0] === "." || ref[0] === "/" || this.target.builtInModuleRefs[ref]) {
+          return "__$i(require(" + JSON.stringify(ref) + "))";
+        } else {
+          return "__$im(require," + JSON.stringify(ref) + ")";
+        }
       }
     },
     anonIDName: {
@@ -2118,7 +2396,7 @@ var PkgCompiler = (function () {
           this.log.debug(this.buildDepDescription(srcfiles));
         }
 
-        var codebuf = new CodeBuffer(_compile_js$path.resolve(this.pkg.dir));
+        var codebuf = new CodeBuffer(_compile_js$path.resolve(this.pkg.dir), this.target);
 
         this.genHeader(srcfiles, codebuf);
 
@@ -2203,10 +2481,6 @@ var PkgCompiler = (function () {
         codebuf.addLine("//#jopkg" + JSON.stringify(pkginfo));
 
         if (_core.Object.keys(runtimeImps).length !== 0 || _core.Object.keys(importRefs).length !== 0) {
-          codebuf.addLine("var _$import = function(ref) { var m = require(ref); " + "return m && m.__esModule ? m[\"default\"] || m : m;" + "}");
-
-          codebuf.addLine(", _$importWC = function(ref) { var m = require(ref); " + "return m && m.__esModule ? m : {\"default\":m};" + "}");
-
           codebuf.addRuntimeImports(runtimeImps, _core.Object.keys(importRefs).length === 0);
 
           this.pkg.imports = codebuf.addModuleImports(importRefs);
@@ -3101,264 +3375,6 @@ var EnvCmd = {
   }) };
 "use strict";
 
-var SrcFile = (function () {
-  function SrcFile() {
-    _classCallCheck(this, SrcFile);
-  }
-
-  _createClass(SrcFile, null, {
-    filenameMatches: {
-      value: function filenameMatches(filename) {
-        return filename.match(/^[^\.].*\.js$/);
-      }
-    }
-  });
-
-  return SrcFile;
-})();
-"use strict";
-
-var npmRefPrefix = "npmjs.com/";
-
-var Pkg = (function () {
-  function Pkg(_ref) {
-    var dir = _ref.dir;
-    var ref = _ref.ref;
-    var jopath = _ref.jopath;
-    var files = _ref.files;
-
-    _classCallCheck(this, Pkg);
-
-    this.dir = dir;
-    this.ref = ref;
-    this.jopath = jopath;
-    this.files = files;
-    this.imports = {};
-    this.exports = {};
-    this.module = null;
-    this.deps = [];
-    this.pkgInfo = null;
-  }
-
-  _createClass(Pkg, {
-    id: {
-      get: function () {
-        return this.ref || this.dir;
-      }
-    },
-    hasMainFunc: {
-      get: function () {
-        return !!this.mainFunc || this.pkgInfo && this.pkgInfo.main;
-      }
-    },
-    resolveOutputFile: {
-      value: _asyncToGenerator(function* (output) {
-        var st = yield _pkg_js$fs.stat(output);
-        if (st && st.isDirectory()) {
-          return _pkg_js$path.basename(this.id) + ".js";
-        }
-        return output;
-      })
-    },
-    loadSrcFiles: {
-      value: function loadSrcFiles() {
-        var _this = this;
-
-        return _core.Promise.all(this.files.map(_asyncToGenerator(function* (fn) {
-          var filename = _this.dir + "/" + fn;
-          var st = yield _pkg_js$fs.stat(filename);
-          var type = _pkg_js$path.extname(fn).substr(1).toLowerCase();
-          return ({
-              dir: _this.dir,
-              name: fn,
-              relpath: fn,
-              st: st,
-              type: type,
-              pkg: _this }
-          );
-        })));
-      }
-    },
-    pkgFromRef: {
-      value: _asyncToGenerator(function* (ref) {
-        var importedAt = arguments[1] === undefined ? null : arguments[1];
-        var target = arguments[2] === undefined ? null : arguments[2];
-
-        var parentPkg = this;
-        var pkgdir;
-
-        if (ref[0] === ".") {
-          pkgdir = _pkg_js$path.normalize(parentPkg.dir + "/" + ref);
-
-          if (parentPkg.ref) {
-            ref = _pkg_js$path.normalize(parentPkg.ref + "/" + ref);
-            if (ref[0] === ".") {
-              throw _pkg_js$SrcError("ImportError", importedAt, "recursive dependency; trying to import parent package from child package");
-            }
-          }
-        }
-
-        var pkg = undefined,
-            importError = undefined,
-            files = [];
-
-        if (ref[0] === ".") {
-          try {
-            files = (yield _pkg_js$fs.readdir(pkgdir)).filter(SrcFile.filenameMatches);
-            pkg = new Pkg({ ref: ref, dir: pkgdir, files: files, jopath: parentPkg.jopath });
-          } catch (e) {
-            if (e.name === "TypeError") {
-              throw e;
-            }
-            importError = e;
-          }
-        } else if (ref.length > npmRefPrefix.length && ref.substr(0, npmRefPrefix.length) === npmRefPrefix) {
-          return new NPMPkg(ref.substr(npmRefPrefix.length));
-        } else {
-          if (target && target.builtInModuleRefs[ref]) {
-            return new BuiltInPkg(ref);
-          }
-          try {
-            var _ref = yield Pkg._envReadRefSrcDir(ref);
-
-            var _ref2 = _slicedToArray(_ref, 3);
-
-            var _files = _ref2[0];
-            var _pkgdir = _ref2[1];
-            var jopath = _ref2[2];
-
-            files = _files.filter(SrcFile.filenameMatches);
-            pkg = new Pkg({ ref: ref, dir: _pkgdir, files: files, jopath: parentPkg.jopath });
-          } catch (e) {
-            if (e.name === "TypeError") {
-              throw e;
-            }
-            importError = e;
-          }
-        }
-
-        if (!importError && files.length === 0) {
-          throw _pkg_js$SrcError("PkgError", null, "no source files found in package \"" + pkg.id + "\"", null, [{ message: "imported here", srcloc: importedAt }]);
-        } else if (importError) {
-          throw _pkg_js$SrcError("ImportError", importedAt, importError.message);
-        }
-
-        return pkg;
-      })
-    }
-  }, {
-    parsePkgInfo: {
-      value: function parsePkgInfo(code) {
-        var jopkgStmtPrefix = "//#jopkg";
-        var end,
-            begin = code.indexOf(jopkgStmtPrefix);
-        if (begin !== -1) {
-          begin += jopkgStmtPrefix.length;
-          end = code.indexOf("\n", begin);
-        }
-        if (begin === -1 || end === -1) {
-          throw new Error("missing jopkg statement");
-        }
-        return JSON.parse(code.substring(begin, end));
-      }
-    },
-    _envReadRefSrcDir: {
-      value: _asyncToGenerator(function* (ref) {
-        return yield Env.readdir(ref, "src");
-      })
-    },
-    fromRef: {
-      value: _asyncToGenerator(function* (ref) {
-        var files = undefined,
-            pkg = undefined;
-        if (ref[0] === "." || ref[0] === "/") {
-          files = (yield _pkg_js$fs.readdir(ref)).filter(SrcFile.filenameMatches);
-          pkg = new Pkg({ ref: null, dir: ref, files: files, jopath: null });
-        } else {
-          var _ref = yield Pkg._envReadRefSrcDir(ref);
-
-          var _ref2 = _slicedToArray(_ref, 3);
-
-          var _files = _ref2[0];
-          var pkgdir = _ref2[1];
-          var jopath = _ref2[2];
-
-          files = _files.filter(SrcFile.filenameMatches);
-          pkg = new Pkg({ ref: ref, dir: pkgdir, files: files, jopath: jopath });
-        }
-        if (files.length === 0) {
-          throw "no source files found in package \"" + pkg.id + "\"";
-        }
-        return pkg;
-      })
-    },
-    fromFiles: {
-      value: _asyncToGenerator(function* (files) {
-        var _iteratorNormalCompletion = true;
-        var _didIteratorError = false;
-        var _iteratorError = undefined;
-
-        try {
-          for (var _iterator = _core.$for.getIterator(files), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
-            var f = _step.value;
-
-            if (!SrcFile.filenameMatches(f)) {
-              throw new Error("unexpected file type \"" + f + "\"");
-            }
-          }
-        } catch (err) {
-          _didIteratorError = true;
-          _iteratorError = err;
-        } finally {
-          try {
-            if (!_iteratorNormalCompletion && _iterator["return"]) {
-              _iterator["return"]();
-            }
-          } finally {
-            if (_didIteratorError) {
-              throw _iteratorError;
-            }
-          }
-        }
-
-        var pkgdir = _pkg_js$path.dirname(files[0]);
-        return new Pkg({ ref: null, dir: pkgdir, files: files, jopath: null });
-      })
-    }
-  });
-
-  return Pkg;
-})();
-
-var BuiltInPkg = (function (_Pkg) {
-  function BuiltInPkg(ref) {
-    _classCallCheck(this, BuiltInPkg);
-
-    _get(_core.Object.getPrototypeOf(BuiltInPkg.prototype), "constructor", this).call(this, { ref: ref });
-  }
-
-  _inherits(BuiltInPkg, _Pkg);
-
-  return BuiltInPkg;
-})(Pkg);
-
-BuiltInPkg.prototype.isBuiltIn = true;
-
-var NPMPkg = (function (_Pkg2) {
-  function NPMPkg(ref) {
-    _classCallCheck(this, NPMPkg);
-
-    _get(_core.Object.getPrototypeOf(NPMPkg.prototype), "constructor", this).call(this, { ref: ref });
-  }
-
-  _inherits(NPMPkg, _Pkg2);
-
-  return NPMPkg;
-})(Pkg);
-
-NPMPkg.prototype.isNPM = true;
-"use strict";
-
 var kSpaces = "                                                                              ";
 var slice = Array.prototype.slice;
 
@@ -3839,15 +3855,15 @@ _target_browser_js$init();
 _cmd_build_js$init();
 _jo_js$init();
 exports.BuildCtx = BuildCtx;
-exports.BuildCmd = BuildCmd;
 exports.EnvCmd = EnvCmd;
+exports.BuildCmd = BuildCmd;
 exports.RemoteControlCmd = RemoteControlCmd;
 exports.CodeBuffer = CodeBuffer;
-exports.Env = Env;
 exports.ExportError = ExportError;
 exports.ReferenceError = ReferenceError;
 exports.CyclicReferenceError = CyclicReferenceError;
 exports.PkgCompiler = PkgCompiler;
+exports.Env = Env;
 exports.Mainv = Mainv;
 exports.Commands = Commands;
 exports.Logger = Logger;

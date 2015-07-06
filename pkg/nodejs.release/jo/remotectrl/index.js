@@ -1,7 +1,5 @@
-//#jopkg{"files":["msgparse.js","remotectrl.js"],"imports":[],"exports":["RemoteControl","SentinelFramedMessageParser"],"babel-runtime":["core-js"],"version":"ibs7sh9u"}
-var _$import = function(ref) { var m = require(ref); return m && m.__esModule ? m["default"] || m : m;}
-, _$importWC = function(ref) { var m = require(ref); return m && m.__esModule ? m : {"default":m};}
-  , _core = _$import("babel-runtime/core-js");
+//#jopkg{"files":["msgparse.js","remotectrl.js"],"imports":[],"exports":["SentinelFramedMessageParser","RemoteControl"],"babel-runtime":["core-js"],"version":"ibshhjhl"}
+var _core = __$irt("babel-runtime/core-js");
 "use strict";
 
 function SentinelFramedMessageParser(sentinel, onFrame) {
@@ -147,6 +145,6 @@ function RemoteControl(parentPID, oncommand) {
     RemoteControl.enabled = true;
   });
 }
-exports.RemoteControl = RemoteControl;
 exports.SentinelFramedMessageParser = SentinelFramedMessageParser;
+exports.RemoteControl = RemoteControl;
 //#sourceMappingURL=index.js.map

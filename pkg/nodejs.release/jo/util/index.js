@@ -1,9 +1,7 @@
-//#jopkg{"files":["jsidentifier.js","levenshtein.js","parseopt.js","repr.js","srcerror.js","srclocation.js","termstyle.js","unique.js"],"imports":["util","path"],"exports":["RE","JSIdentifier","LevenshteinDistance","ParseOpt","repr","SrcError","SrcErrors","SrcLocation","SupportedTerms","TermStyle","Unique"],"babel-runtime":["core-js"],"version":"ibs7sgyi"}
-var _$import = function(ref) { var m = require(ref); return m && m.__esModule ? m["default"] || m : m;}
-, _$importWC = function(ref) { var m = require(ref); return m && m.__esModule ? m : {"default":m};}
-  , _core = _$import("babel-runtime/core-js")
-  , _repr_js$inspect = _$import("util").inspect
-  , _parseopt_js$path = _$import("path");
+//#jopkg{"files":["jsidentifier.js","levenshtein.js","parseopt.js","repr.js","srcerror.js","srclocation.js","termstyle.js","unique.js"],"imports":["util","path"],"exports":["RE","JSIdentifier","LevenshteinDistance","ParseOpt","repr","SrcError","SrcErrors","SrcLocation","SupportedTerms","TermStyle","Unique"],"babel-runtime":["core-js"],"version":"ibshhj5k"}
+var _core = __$irt("babel-runtime/core-js")
+  , _repr_js$inspect = __$i(require("util")).inspect
+  , _parseopt_js$path = __$i(require("path"));
 "use strict";
 
 function Unique(a) {
