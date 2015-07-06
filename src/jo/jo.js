@@ -1,5 +1,4 @@
 import path from 'path'
-import {enableRemoteControl} from './remotectrl'
 import {parseopt, SrcError} from './util'
 
 let usage =
