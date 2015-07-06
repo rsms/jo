@@ -2,6 +2,7 @@ import {Unique} from './util'
 import fs from './asyncfs'
 import path from 'path'
 
+const defaultTarget = TARGET_NODEJS;
 
 var BuildCmd = {
 argdesc: '[input]', desc: 'Builds programs and packages',
@@ -31,6 +32,9 @@ Options:
   ('{{prog}}'), the output file name is the base name of the containing
   directory. If "-" is specified as the output file, output is written to stdout.
 
+-target <target>
+  Specify product target, where <target> can be one of:
+{{targets}}
 `,
 options: {
   o: '<file>        Output filename',
@@ -75,7 +79,7 @@ main: async function(opts, args, usage, cb) {
 
   // Target
   let targetMode = opts.dev ? TARGET_MODE_DEV : TARGET_MODE_RELEASE;
-  let target = Target.create(opts.target || TARGET_NODEJS, targetMode, {
+  let target = Target.create(opts.target || defaultTarget, targetMode, {
     logger: logger,
     output: opts.o,
     globals: opts.globals ? opts.globals.split(/[\s ]*,[\s ]*/g) : null,
@@ -95,3 +99,13 @@ main: async function(opts, args, usage, cb) {
     await target.postMake(pkgs)
   }
 }}
+
+function init() {
+  let targets = '';
+  for (let targetID in Targets) {
+    let target = Targets[targetID];
+    targets += '    ' + targetID + (targetID === defaultTarget ? ' (default)' : '') + '\n';
+  }
+  let params = { targets: targets };
+  BuildCmd.usage = BuildCmd.usage.replace(/\{\{([^\}]+)\}\}/g, (_, k) => params[k] )
+}
