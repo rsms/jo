@@ -1,4 +1,4 @@
-//#jopkg{"files":["__DEV__.js","build.js","cmd-build.js","cmd-env.js","cmd-remotectrl.js","codebuf.js","compile.js","env.js","jo.js","logger.js","module.js","pkg.js","preprocessor.js","srcfile.js","target.js","target_browser.js","target_nodejs.js","tokenizer.js","toposort.js","workdir.js","writecode.js"],"imports":["./asyncfs","path","os","./util","npmjs.com/source-map","npmjs.com/babel","npmjs.com/babel/lib/babel/transformation/file","npmjs.com/babel/lib/babel/transformation/transformer","npmjs.com/babel/lib/babel/generation","./transformers","./remotectrl"],"exports":["BuildCtx","EnvCmd","BuildCmd","RemoteControlCmd","ExportError","ReferenceError","CyclicReferenceError","PkgCompiler","CodeBuffer","Env","Mainv","Commands","Logger","Module","PrecompiledModule","TokenEditor","Preprocessor","Pkg","BuiltInPkg","NPMPkg","SrcFile","TARGET_BROWSER","TARGET_BROWSER_WEBKIT","TARGET_NODEJS","TARGET_MODE_DEV","TARGET_MODE_RELEASE","Targets","TargetOptions","GLOBAL_STD","GLOBAL_DEPRECATED","GLOBAL_UNSAFE","GLOBAL_EXPERIMENTAL","Target","BrowserTarget","NodeJSTarget","Tokenizer","WorkDir"],"babel-runtime":["helpers/async-to-generator","core-js","helpers/class-call-check","helpers/create-class","helpers/inherits","helpers/get","helpers/sliced-to-array","helpers/define-property","helpers/interop-require-wildcard"],"version":"ibs537cb"}
+//#jopkg{"files":["__DEV__.js","build.js","cmd-build.js","cmd-env.js","cmd-remotectrl.js","codebuf.js","compile.js","env.js","jo.js","logger.js","module.js","pkg.js","preprocessor.js","srcfile.js","target.js","target_browser.js","target_nodejs.js","tokenizer.js","toposort.js","workdir.js","writecode.js"],"imports":["./asyncfs","path","os","./util","npmjs.com/source-map","npmjs.com/babel","npmjs.com/babel/lib/babel/transformation/file","npmjs.com/babel/lib/babel/transformation/transformer","npmjs.com/babel/lib/babel/generation","./transformers","./remotectrl"],"exports":["BuildCtx","BuildCmd","EnvCmd","RemoteControlCmd","CodeBuffer","Env","ExportError","ReferenceError","CyclicReferenceError","PkgCompiler","Mainv","Commands","Logger","Module","PrecompiledModule","Pkg","BuiltInPkg","NPMPkg","TokenEditor","Preprocessor","SrcFile","TARGET_BROWSER","TARGET_BROWSER_WEBKIT","TARGET_NODEJS","TARGET_MODE_DEV","TARGET_MODE_RELEASE","Targets","TargetOptions","GLOBAL_STD","GLOBAL_DEPRECATED","GLOBAL_UNSAFE","GLOBAL_EXPERIMENTAL","Target","BrowserTarget","NodeJSTarget","Tokenizer","WorkDir"],"babel-runtime":["helpers/async-to-generator","core-js","helpers/class-call-check","helpers/create-class","helpers/inherits","helpers/get","helpers/sliced-to-array","helpers/define-property","helpers/interop-require-wildcard"],"version":"ibs7sgnn"}
 var _$import = function(ref) { var m = require(ref); return m && m.__esModule ? m["default"] || m : m;}
 , _$importWC = function(ref) { var m = require(ref); return m && m.__esModule ? m : {"default":m};}
   , _asyncToGenerator = _$import("babel-runtime/helpers/async-to-generator")
@@ -52,7 +52,7 @@ var _$import = function(ref) { var m = require(ref); return m && m.__esModule ? 
   , _build_js$SrcLocation = _$$0.SrcLocation
   , _build_js$TermStyle = _$$0.TermStyle
   , _cmd_build_js$Unique = _$$0.Unique
-  , _jo_js$parseopt = _$$0.parseopt
+  , _jo_js$ParseOpt = _$$0.ParseOpt
   , _jo_js$SrcError = _$$0.SrcError
   , _codebuf_js$sourceMap = _$import("npmjs.com/source-map")
   , _compile_js$babel = _$importWC("npmjs.com/babel")
@@ -339,7 +339,7 @@ function fsTryDirs1(filename, basedirSuffix, fn) {
     var paths = Env.paths;
     var dirs = basedirSuffix ? paths.map(function (s) {
       return s + "/" + basedirSuffix;
-    }) : paths;
+    }).concat(Env.JOPATH) : paths;
     var next = (function (_next) {
       var _nextWrapper = function next(_x) {
         return _next.apply(this, arguments);
@@ -664,7 +664,7 @@ var Target = (function () {
     },
     runtimeHelperSourceFilename: {
       value: function runtimeHelperSourceFilename(ref) {
-        var basedir = Env.JOROOT + "/jo/node_modules/babel-runtime/";
+        var basedir = Env.JOROOT + "/node_modules/babel-runtime/";
         if (ref === "regenerator") {
           return basedir + "regenerator/runtime.js";
         } else {
@@ -687,7 +687,7 @@ var Target = (function () {
         }
         var TargetType = Targets[id.toLowerCase()];
         if (!TargetType) {
-          throw new Error("unknown target identifier \"" + id + "\"");
+          throw new Error("unknown target identifier \"" + id + "\" (available targets: " + _core.Object.keys(Targets) + ")");
         }
         return new TargetType(id, mode, options);
       }
@@ -866,9 +866,9 @@ var NodeJSTarget = (function (_Target) {
   return NodeJSTarget;
 })(Target);
 
-process.nextTick(function () {
+function _target_nodejs_js$init() {
   Targets[TARGET_NODEJS] = NodeJSTarget;
-});
+}
 "use strict";
 
 var BrowserTarget = (function (_Target) {
@@ -1205,9 +1205,9 @@ var BrowserTarget = (function (_Target) {
   return BrowserTarget;
 })(Target);
 
-process.nextTick(function () {
-  Targets[TARGET_NODEJS] = NodeJSTarget;
-});
+function _target_browser_js$init() {
+  Targets[TARGET_BROWSER] = BrowserTarget;
+}
 "use strict";
 
 function Tokenizer(code) {
@@ -3663,9 +3663,11 @@ var BuildCtx = (function () {
 })();
 "use strict";
 
+var defaultTarget = TARGET_NODEJS;
+
 var BuildCmd = {
   argdesc: "[input]", desc: "Builds programs and packages",
-  usage: "[options] [<package>...]\n{{prog}} [options] <srcfile>...\n\nOptions:\n{{options}}\n\n<package>\n  If the arguments are a list of source files, build treats them as a list of\n  source files specifying a single package.\n\n  When the command line specifies a single main package, build writes the\n  resulting executable to -o=<file>. Otherwise build compiles the packages but\n  discards the results, serving only as a check that the packages can be built.\n\n  If no arguments are provided, the current working directory is assumed to be\n  a package.\n\n-o <file>\n  The -o flag specifies the output file name. If not specified, the output\n  file name depends on the arguments and derives from the name of the package,\n  such as p.pkg.js for package p, unless p is 'main'. If the package is main\n  and file names are provided, the file name derives from the first file name\n  mentioned, such as f1 for '{{prog}} f1.js f2.js'; with no files provided\n  ('{{prog}}'), the output file name is the base name of the containing\n  directory. If \"-\" is specified as the output file, output is written to stdout.\n\n",
+  usage: "[options] [<package>...]\n{{prog}} [options] <srcfile>...\n\nOptions:\n{{options}}\n\n<package>\n  If the arguments are a list of source files, build treats them as a list of\n  source files specifying a single package.\n\n  When the command line specifies a single main package, build writes the\n  resulting executable to -o=<file>. Otherwise build compiles the packages but\n  discards the results, serving only as a check that the packages can be built.\n\n  If no arguments are provided, the current working directory is assumed to be\n  a package.\n\n-o <file>\n  The -o flag specifies the output file name. If not specified, the output\n  file name depends on the arguments and derives from the name of the package,\n  such as p.pkg.js for package p, unless p is 'main'. If the package is main\n  and file names are provided, the file name derives from the first file name\n  mentioned, such as f1 for '{{prog}} f1.js f2.js'; with no files provided\n  ('{{prog}}'), the output file name is the base name of the containing\n  directory. If \"-\" is specified as the output file, output is written to stdout.\n\n-target <target>\n  Specify product target, where <target> can be one of:\n{{targets}}\n",
   options: {
     o: "<file>        Output filename",
     target: "<target> Generate product for \"browser\", \"browser-webkit\" or \"nodejs\" (default)",
@@ -3704,7 +3706,7 @@ var BuildCmd = {
     var logger = new Logger(opts.D ? Logger.DEBUG : opts.v ? Logger.INFO : Logger.WARN);
 
     var targetMode = opts.dev ? TARGET_MODE_DEV : TARGET_MODE_RELEASE;
-    var target = Target.create(opts.target || TARGET_NODEJS, targetMode, {
+    var target = Target.create(opts.target || defaultTarget, targetMode, {
       logger: logger,
       output: opts.o,
       globals: opts.globals ? opts.globals.split(/[\s ]*,[\s ]*/g) : null });
@@ -3722,23 +3724,35 @@ var BuildCmd = {
       yield target.postMake(pkgs);
     }
   }) };
+
+function _cmd_build_js$init() {
+  var targets = "";
+  for (var targetID in Targets) {
+    var target = Targets[targetID];
+    targets += "    " + targetID + (targetID === defaultTarget ? " (default)" : "") + "\n";
+  }
+  var params = { targets: targets };
+  BuildCmd.usage = BuildCmd.usage.replace(/\{\{([^\}]+)\}\}/g, function (_, k) {
+    return params[k];
+  });
+}
 "use strict";
 
 var Mainv = _asyncToGenerator(function* (argv) {
-  var _parseopt$prog = _jo_js$parseopt.prog(argv);
+  var _ParseOpt$prog = _jo_js$ParseOpt.prog(argv);
 
-  var _parseopt$prog2 = _slicedToArray(_parseopt$prog, 2);
+  var _ParseOpt$prog2 = _slicedToArray(_ParseOpt$prog, 2);
 
-  var prog = _parseopt$prog2[0];
-  var argvRest = _parseopt$prog2[1];
+  var prog = _ParseOpt$prog2[0];
+  var argvRest = _ParseOpt$prog2[1];
 
-  var _parseopt = _jo_js$parseopt(options, argvRest, usage, prog);
+  var _ParseOpt = _jo_js$ParseOpt(options, argvRest, usage, prog);
 
-  var _parseopt2 = _slicedToArray(_parseopt, 3);
+  var _ParseOpt2 = _slicedToArray(_ParseOpt, 3);
 
-  var opts = _parseopt2[0];
-  var args = _parseopt2[1];
-  var dieusage = _parseopt2[2];
+  var opts = _ParseOpt2[0];
+  var args = _ParseOpt2[1];
+  var dieusage = _ParseOpt2[2];
 
   if (args.length === 0) {
     return dieusage("no command specified");
@@ -3759,13 +3773,13 @@ var Mainv = _asyncToGenerator(function* (argv) {
 
   var cmdusage = "{{prog}}" + (cmd.usage ? " " + cmd.usage : "\n");
 
-  var _parseopt3 = _jo_js$parseopt(cmd.options || {}, args.slice(1), cmdusage, prog + " " + cmdname, options);
+  var _ParseOpt3 = _jo_js$ParseOpt(cmd.options || {}, args.slice(1), cmdusage, prog + " " + cmdname, options);
 
-  var _parseopt32 = _slicedToArray(_parseopt3, 3);
+  var _ParseOpt32 = _slicedToArray(_ParseOpt3, 3);
 
-  var cmdopts = _parseopt32[0];
-  var cmdargs = _parseopt32[1];
-  var cmddieusage = _parseopt32[2];
+  var cmdopts = _ParseOpt32[0];
+  var cmdargs = _ParseOpt32[1];
+  var cmddieusage = _ParseOpt32[2];
   var _iteratorNormalCompletion = true;
   var _didIteratorError = false;
   var _iteratorError = undefined;
@@ -3805,11 +3819,7 @@ var Commands = {
   help: { argdesc: "<cmd>", desc: "Show help for a command" }
 };
 
-var didInit = false;
 function _jo_js$init() {
-  if (didInit) {
-    return;
-  }didInit = true;
   var cmds = _core.Object.keys(Commands).map(function (name) {
     return [Commands[name].argdesc ? name + " " + Commands[name].argdesc : name, Commands[name]];
   });
@@ -3821,31 +3831,33 @@ function _jo_js$init() {
   }).join("\n");
   usage = usage.replace(/\{\{commands\}\}/g, commandsUsage);
 }
-_jo_js$init();
 "use strict";
 
 var __DEV__ = true;
+_target_nodejs_js$init();
+_target_browser_js$init();
+_cmd_build_js$init();
 _jo_js$init();
 exports.BuildCtx = BuildCtx;
-exports.EnvCmd = EnvCmd;
 exports.BuildCmd = BuildCmd;
+exports.EnvCmd = EnvCmd;
 exports.RemoteControlCmd = RemoteControlCmd;
+exports.CodeBuffer = CodeBuffer;
+exports.Env = Env;
 exports.ExportError = ExportError;
 exports.ReferenceError = ReferenceError;
 exports.CyclicReferenceError = CyclicReferenceError;
 exports.PkgCompiler = PkgCompiler;
-exports.CodeBuffer = CodeBuffer;
-exports.Env = Env;
 exports.Mainv = Mainv;
 exports.Commands = Commands;
 exports.Logger = Logger;
 exports.Module = Module;
 exports.PrecompiledModule = PrecompiledModule;
-exports.TokenEditor = TokenEditor;
-exports.Preprocessor = Preprocessor;
 exports.Pkg = Pkg;
 exports.BuiltInPkg = BuiltInPkg;
 exports.NPMPkg = NPMPkg;
+exports.TokenEditor = TokenEditor;
+exports.Preprocessor = Preprocessor;
 exports.SrcFile = SrcFile;
 exports.TARGET_BROWSER = TARGET_BROWSER;
 exports.TARGET_BROWSER_WEBKIT = TARGET_BROWSER_WEBKIT;

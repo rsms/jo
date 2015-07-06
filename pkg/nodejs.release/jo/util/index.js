@@ -1,4 +1,4 @@
-//#jopkg{"files":["jsidentifier.js","levenshtein.js","parseopt.js","repr.js","srcerror.js","srclocation.js","termstyle.js","unique.js"],"imports":["util","path"],"exports":["RE","JSIdentifier","LevenshteinDistance","parseopt","repr","SrcError","SrcErrors","SrcLocation","SupportedTerms","TermStyle","Unique"],"babel-runtime":["core-js"],"version":"ibs537mj"}
+//#jopkg{"files":["jsidentifier.js","levenshtein.js","parseopt.js","repr.js","srcerror.js","srclocation.js","termstyle.js","unique.js"],"imports":["util","path"],"exports":["RE","JSIdentifier","LevenshteinDistance","ParseOpt","repr","SrcError","SrcErrors","SrcLocation","SupportedTerms","TermStyle","Unique"],"babel-runtime":["core-js"],"version":"ibs7sgyi"}
 var _$import = function(ref) { var m = require(ref); return m && m.__esModule ? m["default"] || m : m;}
 , _$importWC = function(ref) { var m = require(ref); return m && m.__esModule ? m : {"default":m};}
   , _core = _$import("babel-runtime/core-js")
@@ -424,7 +424,7 @@ function repr(obj) {
 }
 "use strict";
 
-function parseopt(opts, args, usage, prog, hiddenOpts) {
+function ParseOpt(opts, args, usage, prog, hiddenOpts) {
   var optdesc = {},
       nopts = 0,
       helpops = "help",
@@ -522,7 +522,7 @@ function parseopt(opts, args, usage, prog, hiddenOpts) {
   return [optvals, args, showusage];
 }
 
-parseopt.prog = function (argv) {
+ParseOpt.prog = function (argv) {
   var prog = process.env._;
   if (!prog) {
     prog = _parseopt_js$path.relative(process.cwd(), argv[0].indexOf("/node") === -1 ? argv[0] : argv[1]);
@@ -579,7 +579,7 @@ var JSIdentifier = {
 exports.RE = RE;
 exports.JSIdentifier = JSIdentifier;
 exports.LevenshteinDistance = LevenshteinDistance;
-exports.parseopt = parseopt;
+exports.ParseOpt = ParseOpt;
 exports.repr = repr;
 exports.SrcError = SrcError;
 exports.SrcErrors = SrcErrors;

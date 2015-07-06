@@ -1,4 +1,4 @@
-//#jopkg{"files":["asyncfs.js"],"imports":["fs"],"exports":["default"],"babel-runtime":["core-js"],"version":"ibs537qn"}
+//#jopkg{"files":["asyncfs.js"],"imports":["fs"],"exports":["default"],"babel-runtime":["core-js"],"version":"ibs7sh33"}
 var _$import = function(ref) { var m = require(ref); return m && m.__esModule ? m["default"] || m : m;}
 , _$importWC = function(ref) { var m = require(ref); return m && m.__esModule ? m : {"default":m};}
   , _core = _$import("babel-runtime/core-js")
