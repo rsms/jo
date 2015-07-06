@@ -1,5 +1,5 @@
 import {SrcError} from './util'
-import fs from './asyncfs'
+import fs from 'asyncfs'
 import path from 'path'
 
 
@@ -112,12 +112,10 @@ class Pkg {
         importError = e;
       }
 
-    } else if (ref.length > npmRefPrefix.length &&
-               ref.substr(0,npmRefPrefix.length) === npmRefPrefix)
-    {
+    } else if (NPMPkg.refIsNPM(ref)) {
       // NPM package
       // TODO: In the future, we should verify NPM packages using parentPkg.dir etc.
-      return new NPMPkg(ref.substr(npmRefPrefix.length));
+      return new NPMPkg(NPMPkg.stripNPMRefPrefix(ref));
 
     } else {
       // ref
@@ -208,4 +206,11 @@ class NPMPkg extends Pkg {
 }
 
 NPMPkg.prototype.isNPM = true;
+NPMPkg.refIsNPM = function(ref) {
+  return ref.length > npmRefPrefix.length &&
+         ref.substr(0, npmRefPrefix.length) === npmRefPrefix;
+}
+NPMPkg.stripNPMRefPrefix = function(ref) {
+  return ref.substr(npmRefPrefix.length);
+}
 

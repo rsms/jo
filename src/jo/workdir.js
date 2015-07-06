@@ -1,4 +1,4 @@
-import fs from './asyncfs'
+import fs from 'asyncfs'
 import os from 'os'
 
 var WorkDir = {

@@ -2,18 +2,24 @@ import sourceMap from 'npmjs.com/source-map'
 import path from 'path'
 
 class CodeBuffer {
-  constructor(sourceDir:string) {
+  constructor(sourceDir:string, target:Target) {
     this.code = '';
     this.line = 0;
     this.column = 0;
     this.map = new sourceMap.SourceMapGenerator({ file: "out" });
     this.sourceDir = (sourceDir ? sourceDir + '/' : '');
+    this.target = target
     this._nextAnonID = 0;
   }
 
 
+  get lineStart() {
+    Object.defineProperty(this, 'lineStart', {value:'  , '});
+    return 'var ';
+  }
+
+
   addLine(linechunk, srcfilename, srcloc) {
-    ++this.line;
     if (__DEV__) {
       if (linechunk.indexOf('\n') !== -1) {
         throw new Error('unexpected linebreak in linechunk');
@@ -28,12 +34,14 @@ class CodeBuffer {
         {line: this.line, column: linechunk.length }
       );
     }
+    ++this.line;
   }
 
 
   appendCode(code, srcloc, srcfilename) {
     var startLine = this.line;
-    var lines = code.split(/\r?\n/g);
+    code = code.trim();
+    var lines = code.split(/\r?\n/);
     this.code += code + '\n';
     this.line += lines.length + 1;
     if (srcloc) {
@@ -89,7 +97,7 @@ class CodeBuffer {
     });
 
     this.code += code + '\n';
-    this.line += code.split("\n").length + 1;
+    this.line += code.split(/\r?\n/).length;
   }
 
 
@@ -102,7 +110,7 @@ class CodeBuffer {
       let spec = imp.specifiers[0];
       if (spec.id.name === 'default') {
         this.addLine(
-          '  , '+spec.name.name+' = '+this.genRequireExpr(ref)+
+          this.lineStart + spec.name.name+' = __$irt(' + JSON.stringify(ref) + ')' +
           ((isLast && i === runtimeRefs.length-1) ? ';' : '')
         );
       } else {
@@ -162,7 +170,7 @@ class CodeBuffer {
       // Nothing imports the module as "default". We use an anonymous ID.
       defaultIDName = this.anonIDName();
       this.addLine(
-        '  , ' + defaultIDName+' = '+this.genRequireExpr(ref),
+        this.lineStart + defaultIDName+' = '+this.genRequireExpr(ref),
         imps[0].srcfile.name,
         imps[0].source.loc
       );
@@ -206,28 +214,33 @@ class CodeBuffer {
     var close = isLast ? ';' : '';
     if (spec.default) {
       this.addLine(
-        '  , ' + spec.name.name+' = '+impExprCode + close,
+        this.lineStart + spec.name.name+' = '+impExprCode + close,
         imp.srcfile.name,
         imp.loc
       )
       return 'default';
+
     } else if (spec.type === 'ImportBatchSpecifier') {
       // import * as x from 'y'
       //        ^
       let idname = spec.name._origName || spec.name.name;
-      // if (impExprCode.indexOf('_$import(') === 0) {
-      //   impExprCode = JSON.stringify(imp.source.value);
-      // }
+      if (impExprCode.substr(0,5) === '__$i(') {
+        impExprCode = '__$iw(' + impExprCode.substr(5);
+      } else {
+        // assert(impExprCode.substr(0,6) === '__$im(')
+        impExprCode = '__$imw(' + impExprCode.substr(6);
+      }
       this.addLine(
-        '  , ' + spec.name.name + ' = _$importWC('+JSON.stringify(imp.source.value)+')' + close,
+        this.lineStart + spec.name.name + ' = ' + impExprCode + close,
         imp.srcfile.name,
         imp.loc
       )
       return idname;
+
     } else {
       let idname = spec.id._origName || spec.id.name;
       this.addLine(
-        '  , ' + spec.name.name+' = '+impExprCode+'.'+idname + close,
+        this.lineStart + spec.name.name+' = '+impExprCode+'.'+idname + close,
         imp.srcfile.name,
         imp.loc
       )
@@ -237,7 +250,14 @@ class CodeBuffer {
 
 
   genRequireExpr(ref) {
-    return '_$import("' + ref.replace(/"/g, '\\"') + '")';
+    let m;
+    if (NPMPkg.refIsNPM(ref)) {
+      return '__$i(require('+JSON.stringify(NPMPkg.stripNPMRefPrefix(ref))+'))'
+    } else if (ref[0] === '.' || ref[0] === '/' || this.target.builtInModuleRefs[ref]) {
+      return '__$i(require('+JSON.stringify(ref)+'))'
+    } else {
+      return '__$im(require,'+JSON.stringify(ref)+')'
+    }
   }
 
 

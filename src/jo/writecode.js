@@ -1,4 +1,4 @@
-import fs from './asyncfs'
+import fs from 'asyncfs'
 import path from 'path'
 
 async function writeCode(code, sourcemap, outfile, writeToStdout:bool=false) {

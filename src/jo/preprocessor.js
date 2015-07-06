@@ -1,5 +1,5 @@
 import {repr} from './util'
-import fs from './asyncfs'
+import fs from 'asyncfs'
 
 class TokenEditor {
   constructor(tokenizer, srcfile, visitor) {

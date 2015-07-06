@@ -1,4 +1,4 @@
-import fs from './asyncfs'
+import fs from 'asyncfs'
 import path from 'path'
 
 class NodeJSTarget extends Target {
@@ -92,88 +92,102 @@ class NodeJSTarget extends Target {
   }
 
 
-  pkgModuleHeader(pkg:Pkg, depLevel:int) {
-    var isMainProgram = depLevel === 0 && pkg.hasMainFunc;
+  // Program destination
+  programDstFile(pkg:Pkg) {
+    if (this._programDstFile === undefined || this._programDstFile.pkg !== pkg) {
+      var s;
+      if (this.options.output) {
+        s = this.options.output;
+      } else if (pkg.jopath) {
+        let progname = pkg.ref.split('/').pop();
+        s = pkg.jopath + '/bin/' + progname + (this.isDevMode ? '-g' : '');
+      } else {
+        if (pkg.ref) {
+          s = './' + pkg.ref;
+        } else {
+          s = './' + path.resolve(pkg.dir).split('/').pop();
+        }
+      }
+      this._programDstFile = {pkg:pkg,v:s};
+    }
+    return this._programDstFile.v;
+  }
 
-    // Requires explicit NODE_PATH for modules provided by jo?
-    var runtimeModules = this.resolveRequiredRuntimeModules(pkg);
-    var externalModulePaths = [];
+
+  pkgModuleHeader(pkg:Pkg, depLevel:int) {
+    if (depLevel === 0 && pkg.hasMainFunc) {
+      // Building a program
+      return this.programBootCode(pkg);
+    }
+  }
+
+
+  programBootCode(pkg:Pkg) {
+    if (this._programBootCode && this._programBootCode.pkg === pkg) {
+      return this._programBootCode.v;
+    }
+
+    // #!node
+    let nodeArgs = ' --harmony';
+    if (this.isDevMode) {
+      nodeArgs += ' --stack-trace-limit=25';
+    }
+    let shebang = '#!/usr/bin/env node' + nodeArgs + '\n';
+    // header += '#!/usr/bin/env NODE_PATH=/Users/rasmus/src2/jo/pkg/npm node' + nodeArgs + '\n';
 
     // JOROOT to bake into source
     let bakedJOROOT;
 
-    if (isMainProgram) {
-
-      // Program destination
-      if (this.options.output) {
-        this.programDstFile = this.options.output;
-      } else if (pkg.jopath) {
-        let progname = pkg.ref.split('/').pop();
-        this.programDstFile = pkg.jopath + '/bin/' + progname + (this.isDevMode ? '-g' : '');
-      } else {
-        if (pkg.ref) {
-          this.programDstFile = './' + pkg.ref;
-        } else {
-          this.programDstFile = './' + path.resolve(pkg.dir).split('/').pop();
-        }
-      }
-
-      // Attempt relative path for same joroot
-      let dstDirAbs = path.dirname(path.resolve(this.programDstFile));
-      if (dstDirAbs.indexOf(Env.JOROOT) === 0) {
-        bakedJOROOT = '__dirname+' +
-          JSON.stringify(path.relative(dstDirAbs, Env.JOROOT)).replace(/^"/, '"/');
-      }
-      // console.log('dstDirAbs:', dstDirAbs);
-      // console.log('bakedJOROOT2:', path.relative(dstDirAbs, Env.JOROOT));
-      // console.log('pkg.jopath', pkg.jopath)
-      // console.log('pkg.dir   ', pkg.dir)
-      // console.log('Env.JOROOT', Env.JOROOT)
-    }
-
-    if (!bakedJOROOT) {
+    // Attempt relative path for same joroot
+    let dstDirAbs = path.dirname(path.resolve(this.programDstFile(pkg)));
+    if (dstDirAbs.indexOf(Env.JOROOT) === 0) {
+      bakedJOROOT = '__dirname+' +
+        JSON.stringify(path.relative(dstDirAbs, Env.JOROOT)).replace(/^"/, '"/');
+    } else {
       bakedJOROOT = JSON.stringify(Env.JOROOT);
     }
 
+    let joRootJS = 'require("path").' +
+      (bakedJOROOT === '__dirname+"/.."' ? 'dirname(__dirname)' :
+                                           'resolve(' + bakedJOROOT + ')');
 
-    let header = '';
-
-    if (isMainProgram) {
-      // #!node
-      let nodeArgs = ' --harmony';
-      if (this.isDevMode) {
-        nodeArgs += ' --stack-trace-limit=25';
+    // Import support functions
+    let code = `
+require("source-map-support").install();
+var __$fex=require("fs").existsSync
+,__$p
+,__$lpkg=function(q,ref){
+  var i,d,v;
+  if(!__$p){
+    d=${JSON.stringify('/pkg/'+this.pkgDirName+'/')};
+    __$p=[(process.env.JOROOT||${joRootJS})+d];
+    if(v=process.env.JOPATH){
+      v=v.split(":");
+      for(i in v){
+        if(v[i])__$p.push(v[i]+d);
       }
-      header += '#!/usr/bin/env node' + nodeArgs + '\n';
-
-      // baked JOROOT
-      header += 'var _$JOROOT=(process.env.JOROOT||require("path").' +
-        (bakedJOROOT === '__dirname+"/.."' ? 'dirname(__dirname)' : 'resolve(' + bakedJOROOT + ')') +
-      ');';
-
-      // node_modules?
-      if (runtimeModules.length !== 0 || isMainProgram /* requires source-map-support */) {
-        externalModulePaths.push('_$JOROOT+"/pkg/npm"');
-      }
-
-      // Imports modules from jo/pkg?
-      // Note: [dev] test for any non-relative import: .some(s => s[0] !== '.')
-      if (pkg.pkgInfo.imports.length !== 0) {
-        // e.g. JOROOT/pkg/nodejs.release
-        externalModulePaths.push(
-          '_$JOROOT+' + JSON.stringify(this.pkgDirName).replace(/^"/, '"/pkg/')
-        );
-      }
-
-      if (externalModulePaths.length !== 0) {
-        let s = '[0,0,' + externalModulePaths.join(',') + ']';
-        header += 'Array.prototype.splice.apply(module.paths,' + s + ');\n';
-      }
-
-      header += "require('source-map-support').install();\n";
     }
+  }
+  for(i in __$p){
+    d=__$p[i]+ref+"/index.js";
+    if(__$fex(d)){
+      return q(d);
+    }
+  }
+  return q(ref);
+}
+,__$i=global.__$i=function(m){return m && m.__esModule ? (m["default"] || m) : m; }
+,__$iw=global.__$iw=function(m){return m && m.__esModule ? m : {"default":m}; };
+global.__$im=function(q,r){return __$i(__$lpkg(q,r));};
+global.__$irt=function(r){return __$i(require(r));};
+global.__$imw=function(q,r){return __$iw(__$lpkg(q,r));};
+    `;
 
-    return header;
+    code = shebang + (this.isDevMode ? code.trim() :
+                                       code.replace(/[ \t]*\r?\n[ \t]*/mg, ''));
+
+    this._programBootCode = {pkg:pkg,v:code};
+    return code;
   }
 
 
@@ -208,7 +222,8 @@ class NodeJSTarget extends Target {
       fileMode = 438; // 0666
     }
 
-    let writeToStdout = this.options.output && this.programDstFile === '-';
+    var programDstFile = this.programDstFile(pkg);
+    let writeToStdout = this.options.output && programDstFile === '-';
 
     // Add main function call
     let code = pkg.module.code;
@@ -226,9 +241,9 @@ class NodeJSTarget extends Target {
     //   ...
     // }
 
-    await writeCode(code, pkg.module.map, this.programDstFile, writeToStdout);
+    await writeCode(code, pkg.module.map, programDstFile, writeToStdout);
     if (!writeToStdout) {
-      await fs.chmod(this.programDstFile, fileMode);
+      await fs.chmod(programDstFile, fileMode);
     }
   }
 

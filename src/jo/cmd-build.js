@@ -1,5 +1,5 @@
 import {Unique} from './util'
-import fs from './asyncfs'
+import fs from 'asyncfs'
 import path from 'path'
 
 const defaultTarget = TARGET_NODEJS;

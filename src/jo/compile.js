@@ -1,4 +1,4 @@
-import fs from './asyncfs'
+import fs from 'asyncfs'
 import path from 'path'
 import * as babel from 'npmjs.com/babel'
 import BabelFile from 'npmjs.com/babel/lib/babel/transformation/file';
@@ -149,7 +149,7 @@ class PkgCompiler {
     }
 
     // Code buffer we'll use to build module code
-    var codebuf = new CodeBuffer(path.resolve(this.pkg.dir));
+    var codebuf = new CodeBuffer(path.resolve(this.pkg.dir), this.target);
 
     // Add header
     this.genHeader(srcfiles, codebuf);
@@ -233,19 +233,20 @@ class PkgCompiler {
 
     // Add imports
     if (Object.keys(runtimeImps).length !== 0 || Object.keys(importRefs).length !== 0) {
-      // Add interop require
-      codebuf.addLine(
-        'var _$import = function(ref) { var m = require(ref); '+
-          'return m && m.__esModule ? m["default"] || m : m;'+
-        '}'
-      );
 
-      // TODO: Only add this if needed ("import * as x from 'y'")
-      codebuf.addLine(
-        ', _$importWC = function(ref) { var m = require(ref); '+
-          'return m && m.__esModule ? m : {"default":m};'+
-        '}'
-      );
+      // // Add interop require
+      // codebuf.addLine(
+      //   'var _$import = function(m) {'+
+      //     'return m && m.__esModule ? m["default"] || m : m;'+
+      //   '}'
+      // );
+
+      // // TODO: Only add this if needed ("import * as x from 'y'")
+      // codebuf.addLine(
+      //   ', _$importWC = function(m) {'+
+      //     'return m && m.__esModule ? m : {"default":m};'+
+      //   '}'
+      // );
 
       // Add runtime helpers
       codebuf.addRuntimeImports(runtimeImps, Object.keys(importRefs).length===0);

@@ -1,6 +1,6 @@
 // .bashrc: export PATH=$PATH:${JOPATH//://bin:}/bin
 import path from 'path'
-import fs from './asyncfs'
+import fs from 'asyncfs'
 import {repr} from './util'
 
 var _JOPATH, _paths;
