@@ -296,10 +296,6 @@ class BrowserTarget extends Target {
 
 }
 
-process.nextTick(() => {
-  Targets[TARGET_NODEJS] = NodeJSTarget;
-})
-
-// function init() {
-//   Targets[TARGET_BROWSER] = BrowserTarget;
-// }
+function init() {
+  Targets[TARGET_BROWSER] = BrowserTarget;
+}

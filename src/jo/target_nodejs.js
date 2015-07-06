@@ -234,11 +234,6 @@ class NodeJSTarget extends Target {
 
 }
 
-// if (typeof __JO__ === 'undefined')
-process.nextTick(() => {
+function init() {
   Targets[TARGET_NODEJS] = NodeJSTarget;
-})
-
-// function init() {
-//   Targets[TARGET_NODEJS] = NodeJSTarget;
-// }
+}

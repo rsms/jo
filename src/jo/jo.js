@@ -64,9 +64,7 @@ async function Mainv(argv) {
 }
 
 
-var didInit = false; // xxx self-build
 function init() {
-  if (didInit) { return; } didInit = true; // xxx self-build
   // Add commands to usage
   let cmds = Object.keys(Commands).map(name =>
     [(Commands[name].argdesc ? name + ' ' + Commands[name].argdesc : name), Commands[name]] )
@@ -78,4 +76,3 @@ function init() {
   ).join('\n')
   usage = usage.replace(/\{\{commands\}\}/g, commandsUsage)
 }
-init(); // xxx self-build
