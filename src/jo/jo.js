@@ -1,5 +1,5 @@
 import path from 'path'
-import {parseopt, SrcError} from './util'
+import {ParseOpt, SrcError} from './util'
 
 let usage =
 `Jo builds JavaScript programs
@@ -27,8 +27,8 @@ var Commands = {
 }
 
 async function Mainv(argv) {
-  let [prog, argvRest] = parseopt.prog(argv)
-  let [opts, args, dieusage] = parseopt(options, argvRest, usage, prog);
+  let [prog, argvRest] = ParseOpt.prog(argv)
+  let [opts, args, dieusage] = ParseOpt(options, argvRest, usage, prog);
 
   if (args.length === 0) {
     return dieusage('no command specified')
@@ -48,7 +48,7 @@ async function Mainv(argv) {
   }
 
   let cmdusage = "{{prog}}" + (cmd.usage ? " " + cmd.usage : "\n")
-  let [cmdopts, cmdargs, cmddieusage] = parseopt(
+  let [cmdopts, cmdargs, cmddieusage] = ParseOpt(
     cmd.options || {},
     args.slice(1),
     cmdusage,

@@ -7,9 +7,9 @@ import path from 'path'
 //  -foo --foo
 //  -bar v --bar v -bar=v --bar=v
 //
-// parseopt(opts:{string:any}, args:string[], usage:string|function, hiddenOpts:{string:any}) ->
+// ParseOpt(opts:{string:any}, args:string[], usage:string|function, hiddenOpts:{string:any}) ->
 //   [optv:{string:any}, args:string[], showusage:function()]
-export function parseopt(opts, args, usage, prog, hiddenOpts) {
+function ParseOpt(opts, args, usage, prog, hiddenOpts) {
   var optdesc = {}, nopts = 0, helpops = 'help', opmaxlen = helpops.length;
   var optvals = {}, hiddenOptDesc = {}
   var spaces = '                                                                 ';
@@ -105,7 +105,7 @@ export function parseopt(opts, args, usage, prog, hiddenOpts) {
 }
 
 // prog(argv:string[]):[prog:string, argvRest:string[]]
-parseopt.prog = function (argv) {
+ParseOpt.prog = function (argv) {
   let prog = process.env._;
   if (!prog) {
     prog = path.relative(process.cwd(), (argv[0].indexOf('/node') === -1) ? argv[0] : argv[1]);
