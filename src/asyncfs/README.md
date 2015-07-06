@@ -1,5 +1,3 @@
-# Nodejs/iojs async/await/Promise fs
-
 async/await/Promise version of Nodejs/IOjs "fs" module, acting as a slot-in replacement.
 
 ## Async functions
