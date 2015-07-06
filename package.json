@@ -1,6 +1,6 @@
 {
   "name": "jo",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Go-style JavaScript ES6 package compiler",
   "keywords": ["es6", "go", "compiler", "babel"],
   "license": {"type":"MIT","url":"https://github.com/rsms/jo/#mit-license"},
