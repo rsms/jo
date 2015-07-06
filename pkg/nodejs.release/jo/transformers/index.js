@@ -1,4 +1,4 @@
-//#jopkg{"files":["class-hierarcy.js","file-local-vars.js","modules.js"],"imports":["../util","npmjs.com/babel"],"exports":["ReferenceError","FileLocalVarsTransformer","ImportError","ModuleTransformer","ClassHierarchyTransformer"],"babel-runtime":["core-js"],"version":"ibs2gg84"}
+//#jopkg{"files":["class-hierarcy.js","file-local-vars.js","modules.js"],"imports":["../util","npmjs.com/babel"],"exports":["ImportError","ModuleTransformer","ClassHierarchyTransformer","ReferenceError","FileLocalVarsTransformer"],"babel-runtime":["core-js"],"version":"ibs537vr"}
 var _$import = function(ref) { var m = require(ref); return m && m.__esModule ? m["default"] || m : m;}
 , _$importWC = function(ref) { var m = require(ref); return m && m.__esModule ? m : {"default":m};}
   , _core = _$import("babel-runtime/core-js")
@@ -308,9 +308,9 @@ var ClassHierarchyTransformer = {
   }
 
 };
-exports.ReferenceError = ReferenceError;
-exports.FileLocalVarsTransformer = FileLocalVarsTransformer;
 exports.ImportError = ImportError;
 exports.ModuleTransformer = ModuleTransformer;
 exports.ClassHierarchyTransformer = ClassHierarchyTransformer;
+exports.ReferenceError = ReferenceError;
+exports.FileLocalVarsTransformer = FileLocalVarsTransformer;
 //#sourceMappingURL=index.js.map

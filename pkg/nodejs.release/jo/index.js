@@ -1,4 +1,4 @@
-//#jopkg{"files":["__DEV__.js","build.js","cmd-build.js","cmd-env.js","cmd-remotectrl.js","codebuf.js","compile.js","env.js","jo.js","logger.js","module.js","pkg.js","preprocessor.js","srcfile.js","target.js","target_browser.js","target_nodejs.js","tokenizer.js","toposort.js","workdir.js","writecode.js"],"imports":["./asyncfs","path","os","./util","npmjs.com/source-map","npmjs.com/babel","npmjs.com/babel/lib/babel/transformation/file","npmjs.com/babel/lib/babel/transformation/transformer","npmjs.com/babel/lib/babel/generation","./transformers","./remotectrl"],"exports":["BuildCtx","BuildCmd","EnvCmd","RemoteControlCmd","CodeBuffer","ExportError","ReferenceError","CyclicReferenceError","PkgCompiler","Mainv","Commands","Env","Logger","Module","PrecompiledModule","Pkg","BuiltInPkg","NPMPkg","TokenEditor","Preprocessor","SrcFile","TARGET_BROWSER","TARGET_BROWSER_WEBKIT","TARGET_NODEJS","TARGET_MODE_DEV","TARGET_MODE_RELEASE","Targets","TargetOptions","GLOBAL_STD","GLOBAL_DEPRECATED","GLOBAL_UNSAFE","GLOBAL_EXPERIMENTAL","Target","NodeJSTarget","BrowserTarget","Tokenizer","WorkDir"],"babel-runtime":["helpers/async-to-generator","core-js","helpers/class-call-check","helpers/create-class","helpers/inherits","helpers/get","helpers/sliced-to-array","helpers/define-property","helpers/interop-require-wildcard"],"version":"ibs2gfn1"}
+//#jopkg{"files":["__DEV__.js","build.js","cmd-build.js","cmd-env.js","cmd-remotectrl.js","codebuf.js","compile.js","env.js","jo.js","logger.js","module.js","pkg.js","preprocessor.js","srcfile.js","target.js","target_browser.js","target_nodejs.js","tokenizer.js","toposort.js","workdir.js","writecode.js"],"imports":["./asyncfs","path","os","./util","npmjs.com/source-map","npmjs.com/babel","npmjs.com/babel/lib/babel/transformation/file","npmjs.com/babel/lib/babel/transformation/transformer","npmjs.com/babel/lib/babel/generation","./transformers","./remotectrl"],"exports":["BuildCtx","EnvCmd","BuildCmd","RemoteControlCmd","ExportError","ReferenceError","CyclicReferenceError","PkgCompiler","CodeBuffer","Env","Mainv","Commands","Logger","Module","PrecompiledModule","TokenEditor","Preprocessor","Pkg","BuiltInPkg","NPMPkg","SrcFile","TARGET_BROWSER","TARGET_BROWSER_WEBKIT","TARGET_NODEJS","TARGET_MODE_DEV","TARGET_MODE_RELEASE","Targets","TargetOptions","GLOBAL_STD","GLOBAL_DEPRECATED","GLOBAL_UNSAFE","GLOBAL_EXPERIMENTAL","Target","BrowserTarget","NodeJSTarget","Tokenizer","WorkDir"],"babel-runtime":["helpers/async-to-generator","core-js","helpers/class-call-check","helpers/create-class","helpers/inherits","helpers/get","helpers/sliced-to-array","helpers/define-property","helpers/interop-require-wildcard"],"version":"ibs537cb"}
 var _$import = function(ref) { var m = require(ref); return m && m.__esModule ? m["default"] || m : m;}
 , _$importWC = function(ref) { var m = require(ref); return m && m.__esModule ? m : {"default":m};}
   , _asyncToGenerator = _$import("babel-runtime/helpers/async-to-generator")
@@ -63,9 +63,7 @@ var _$import = function(ref) { var m = require(ref); return m && m.__esModule ? 
   , _compile_js$ModuleTransformer = _$$1.ModuleTransformer
   , _compile_js$FileLocalVarsTransformer = _$$1.FileLocalVarsTransformer
   , _compile_js$ClassHierarchyTransformer = _$$1.ClassHierarchyTransformer
-  , _$$2 = _$import("./remotectrl")
-  , _cmd_remotectrl_js$RemoteControl = _$$2.RemoteControl
-  , _jo_js$enableRemoteControl = _$$2.enableRemoteControl;
+  , _cmd_remotectrl_js$RemoteControl = _$import("./remotectrl").RemoteControl;
 "use strict";
 
 var writeCode = _asyncToGenerator(function* (code, sourcemap, outfile) {
@@ -3829,25 +3827,25 @@ _jo_js$init();
 var __DEV__ = true;
 _jo_js$init();
 exports.BuildCtx = BuildCtx;
-exports.BuildCmd = BuildCmd;
 exports.EnvCmd = EnvCmd;
+exports.BuildCmd = BuildCmd;
 exports.RemoteControlCmd = RemoteControlCmd;
-exports.CodeBuffer = CodeBuffer;
 exports.ExportError = ExportError;
 exports.ReferenceError = ReferenceError;
 exports.CyclicReferenceError = CyclicReferenceError;
 exports.PkgCompiler = PkgCompiler;
+exports.CodeBuffer = CodeBuffer;
+exports.Env = Env;
 exports.Mainv = Mainv;
 exports.Commands = Commands;
-exports.Env = Env;
 exports.Logger = Logger;
 exports.Module = Module;
 exports.PrecompiledModule = PrecompiledModule;
+exports.TokenEditor = TokenEditor;
+exports.Preprocessor = Preprocessor;
 exports.Pkg = Pkg;
 exports.BuiltInPkg = BuiltInPkg;
 exports.NPMPkg = NPMPkg;
-exports.TokenEditor = TokenEditor;
-exports.Preprocessor = Preprocessor;
 exports.SrcFile = SrcFile;
 exports.TARGET_BROWSER = TARGET_BROWSER;
 exports.TARGET_BROWSER_WEBKIT = TARGET_BROWSER_WEBKIT;
@@ -3861,8 +3859,8 @@ exports.GLOBAL_DEPRECATED = GLOBAL_DEPRECATED;
 exports.GLOBAL_UNSAFE = GLOBAL_UNSAFE;
 exports.GLOBAL_EXPERIMENTAL = GLOBAL_EXPERIMENTAL;
 exports.Target = Target;
-exports.NodeJSTarget = NodeJSTarget;
 exports.BrowserTarget = BrowserTarget;
+exports.NodeJSTarget = NodeJSTarget;
 exports.Tokenizer = Tokenizer;
 exports.WorkDir = WorkDir;
 //#sourceMappingURL=index.js.map

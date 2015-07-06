@@ -1,7 +1,7 @@
 #!/usr/bin/env node --harmony
 var _$JOROOT=(process.env.JOROOT||require("path").dirname(__dirname));Array.prototype.splice.apply(module.paths,[0,0,_$JOROOT+"/pkg/npm",_$JOROOT+"/pkg/nodejs.release"]);
 require('source-map-support').install();
-//#jopkg{"files":["main.js"],"imports":["jo","jo/util"],"exports":[],"babel-runtime":["helpers/sliced-to-array"],"version":"ibs2gdxx","main":true}
+//#jopkg{"files":["main.js"],"imports":["jo","jo/util"],"exports":[],"babel-runtime":["helpers/sliced-to-array"],"version":"ibs535md","main":true}
 var _$import = function(ref) { var m = require(ref); return m && m.__esModule ? m["default"] || m : m;}
 , _$importWC = function(ref) { var m = require(ref); return m && m.__esModule ? m : {"default":m};}
   , _slicedToArray = _$import("babel-runtime/helpers/sliced-to-array")

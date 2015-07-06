@@ -1,4 +1,4 @@
-//#jopkg{"files":["msgparse.js","remotectrl.js"],"imports":[],"exports":["SentinelFramedMessageParser","RemoteControl"],"babel-runtime":["core-js"],"version":"ibs2ggaw"}
+//#jopkg{"files":["msgparse.js","remotectrl.js"],"imports":[],"exports":["SentinelFramedMessageParser","RemoteControl"],"babel-runtime":["core-js"],"version":"ibs537yf"}
 var _$import = function(ref) { var m = require(ref); return m && m.__esModule ? m["default"] || m : m;}
 , _$importWC = function(ref) { var m = require(ref); return m && m.__esModule ? m : {"default":m};}
   , _core = _$import("babel-runtime/core-js");
