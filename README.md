@@ -362,6 +362,8 @@ $ jo build
 
 Because of Jo packages being composed of a variable number of files which order is undefined, there's no clear way of running package initialization code, code that needs to be run when the package's module is imported. In a traditional module this is not a problem as a traditional module is just a single file, so you just add your initialization code to the end of the file, but with Jo packages this isn't possible when more than one file is used.
 
+> init is called after all the variable declarations in the package have evaluated their initializers, and those are evaluated only after all the imported packages have been initialized. Any init functions are called before any main function is called.
+
 Go solves this by allowing each file to define an "init" function, and so does Jo:
 
 foo/a.js
@@ -447,7 +449,7 @@ foo/index.html
 <html lang="en">
   <head>
     <meta charset="utf-8">
-      <script type="text/javascript">
+    <script type="text/javascript">
     _$jomodules = {};
     (function(){
       // Code to load all packages, resolve imports and finally invoke any main() function
