@@ -295,12 +295,11 @@ Like Go, Jo dictates where dependency packages are located. When a non-relative 
 
 As ES6 does not specify the effect of the `import` statement (only the syntax), Jo attempts to be as flexible as possible to allow as many meningful forms as possible.
 
-One of the forms usually not understood by other ES6 systems is the short form (matching Go). The following statements are all equivalent:
+One of the forms usually not understood by other ES6 systems is the short form (matching Go). The following statements are both equivalent:
 
 ```js
 import "foo/bar"
 import bar from "foo/bar"
-import * as bar from "foo/bar"
 ```
 
 The first form import the "default" namespace of the module into an inferred name based on the package's ref (i.e. "bar"). How the name is inferred from follows the rules of Go.
