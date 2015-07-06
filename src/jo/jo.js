@@ -27,7 +27,7 @@ var Commands = {
   help:       {argdesc:'<cmd>', desc:'Show help for a command'}
 }
 
-export async function Mainv(argv) {
+async function Mainv(argv) {
   let [prog, argvRest] = parseopt.prog(argv)
   let [opts, args, dieusage] = parseopt(options, argvRest, usage, prog);
 

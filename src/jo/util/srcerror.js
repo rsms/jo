@@ -1,6 +1,6 @@
 var util = require('util');
 
-export function SrcError(name, srcloc, message, suggestion, related) {
+function SrcError(name, srcloc, message, suggestion, related) {
   if (!(this instanceof SrcError)) {
     return new SrcError(name, srcloc, message, suggestion, related);
   }
@@ -20,7 +20,7 @@ export function SrcError(name, srcloc, message, suggestion, related) {
 }
 
 
-export function SrcErrors(errors) {
+function SrcErrors(errors) {
   return Object.create(SrcErrors.prototype, {
     errors: {value:errors, enumerable:true},
   }); 

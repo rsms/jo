@@ -1,6 +1,6 @@
 // Compute the edit distance between the two given strings
 // https://gist.github.com/andrei-m/982927
-export function LevenshteinDistance(a, b) {
+function LevenshteinDistance(a, b) {
   if (a.length == 0) { return b.length; }
   if (b.length == 0) { return a.length; }
 

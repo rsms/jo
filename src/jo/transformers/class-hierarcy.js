@@ -1,4 +1,4 @@
-export var ClassHierarchyTransformer = {
+var ClassHierarchyTransformer = {
 
   ClassDeclaration(node, parent, scope, file) {
     if (!file.jofile.classDeclaration) { file.jofile.classDeclaration = {}; }

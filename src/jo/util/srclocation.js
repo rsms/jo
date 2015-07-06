@@ -24,7 +24,7 @@ interface SrcLocation {
 //   endLine?:int,
 //   endColumn?:int
 // }):SrcLocation
-export function SrcLocation(props) {
+function SrcLocation(props) {
   if (arguments.length === 2) {
     let node = arguments[0], file = arguments[1];
     let filename = null;

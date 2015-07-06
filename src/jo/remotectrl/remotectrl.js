@@ -27,7 +27,7 @@
 var origConsole = {log:console.log, warn:console.warn, error:console.error};
 var origProcess = {send:process.send};
 
-export function RemoteControl(parentPID, oncommand) { return new Promise((_resolve, _reject) => {
+function RemoteControl(parentPID, oncommand) { return new Promise((_resolve, _reject) => {
   if (RemoteControl.enabled) {
     return _reject(new Error('remote control is aldready enabled'));
   }

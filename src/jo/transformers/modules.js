@@ -23,7 +23,7 @@ function isImplicitExportName(name) {
 }
 
 
-export var ModuleTransformer = {
+var ModuleTransformer = {
 
   ImportDeclaration(node, parent, scope, file) {
     if (node.isType) return;

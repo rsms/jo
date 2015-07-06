@@ -74,7 +74,7 @@ function mklazyprop(propname, wstream) {
   }};
 }
 
-export var TermStyle = Object.create(null, {
+var TermStyle = Object.create(null, {
   stdout: mklazyprop('stdout', process.stdout),
   stderr: mklazyprop('stderr', process.stderr),
 });

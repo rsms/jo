@@ -1,4 +1,4 @@
-export function Unique(a) {
+function Unique(a) {
   var b = [], c, i = a.length;
   while (i--) {
     c = a[i];

@@ -7,7 +7,7 @@ function ReferenceError(file, node, message, related) {
 }
 
 
-export var FileLocalVarsTransformer = {
+var FileLocalVarsTransformer = {
 
   IfStatement(node, parent, scope, file) {
     var test = node.test;
