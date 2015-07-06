@@ -1,4 +1,4 @@
-Jo is a Go-style JavaScript ES6 compiler and packager, based on Babel.
+Jo is a [Go-style](http://golang.org/doc/code.html#Introduction) JavaScript ES6 compiler and packager, based on [Babel](http://babeljs.io/).
 
 - Go-style *[convention over configuration](https://en.wikipedia.org/wiki/Convention_over_configuration)* means Jo is straight-forward and opinionated
 - Modules are comprised of directories, not files
