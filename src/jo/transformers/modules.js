@@ -52,23 +52,7 @@ var ModuleTransformer = {
             origName = spec.id.name;
             spec.id._origName = spec.id.name;
             spec.name = file.joLocalizeIdentifier(spec.id.name)
-          }
-          if (spec.type === 'ImportBatchSpecifier') {
-            let rtHelperNode = {
-              _blockHoist: 3,
-              type: 'ImportDeclaration',
-              specifiers: [
-                { type: 'ImportSpecifier',
-                  id: { type: 'Identifier', name: 'default' },
-                  name: { type: 'Identifier', name: '_interopRequireWildcard' },
-                }
-              ],
-              source: { type: 'Literal', value: 'babel-runtime/helpers/interop-require-wildcard' },
-              jo_isRuntimeHelper: true,
-            };
-            // file.scope.registerDeclaration(rtHelperNode);
-            file.scope.registerBinding("module", rtHelperNode);
-            file.joImports.push(rtHelperNode);
+            // console.log('spec', repr(spec,3)); // path
           }
           spec.name._origName = origName; // because scope.rename() later on
           if (spec.default) {
@@ -82,24 +66,34 @@ var ModuleTransformer = {
         //   // node.specifiers[0].default = true;
         // }
       } else {
-        // TODO: `import "bar/jo-foo.git"` -> `import foo from "bar/jo-foo.git"`
+        // Shorthand `import "bar/jo-foo.git"` == `import foo from "bar/jo-foo.git"`
         let name = JSIdentifier.fromString(node.source.value);
         if (!name || !JSIdentifier.isValid(name)) {
           throw ImportError(file.jofile, node.source, 'failed to infer module identifier');
         }
-        let id = file.joLocalizeIdentifier(name)
-        node.specifiers = [ t.importSpecifier(t.identifier("default"), id) ];
-        node.specifiers[0].default = true;
+        
+        // Register binding as name (not yet localized) so that we later can correctly
+        // perform scope.rename
+        let spec = t.importSpecifier(null, t.identifier(name));
+        spec.default = true;
+        node.specifiers = [ spec ];
+        file.scope.registerBinding("module", node);
+
+        // Localize id
+        let id = file.joLocalizeIdentifier(name);
+        spec = t.importSpecifier(null, id);
+        spec.default = true;
+        node.specifiers = [ spec ];
       }
     }
 
     // Extract imports -- will eventually be hoisted to package header
     file.joImports.push(node);
-    try {
-      file.scope.registerBinding("module", node);
-    } catch (e) {
-      // Most likely duplicate
-    }
+    // try {
+    //   file.scope.registerBinding("module", node);
+    // } catch (e) {
+    //   // Most likely duplicate
+    // }
     return [];
   },
 

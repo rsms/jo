@@ -44,13 +44,21 @@ class CodeBuffer {
     var lines = code.split(/\r?\n/);
     this.code += code + '\n';
     this.line += lines.length + 1;
+    let genStart = {line: startLine, column: 1 };
+    let genEnd = {line: this.line, column: lines[lines.length-1].length };
     if (srcloc) {
-      this.addSrcLocMapping(
-        srcloc,
-        srcfilename,
-        {line: startLine, column: 1 },
-        {line: this.line, column: lines[lines.length-1].length }
-      );
+      this.addSrcLocMapping(srcloc, srcfilename, genStart, genEnd);
+    } else if (srcfilename) {
+      this.map.addMapping({
+        original:  {line: 1, column: 1},
+        generated: genStart,
+        source:    srcfilename,
+      });
+      this.map.addMapping({
+        original:  {line: lines.length, column: 1},
+        generated: genEnd,
+        source:    srcfilename,
+      });
     }
   }
 

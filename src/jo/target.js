@@ -235,7 +235,6 @@ class Target {
     // Transforms based on "debug" or "release" build settings:
     if (this.mode === TARGET_MODE_RELEASE) {
       transforms = transforms.concat([
-        'utility.removeConsole',       // `console...` -> ``
         'utility.removeDebugger',      // `debugger` -> ``
         //Note: 'utility.inlineExpressions' is causes regex to disappear (babel 4.7.16)
         'utility.deadCodeElimination', // `if (0) { foo(); } else { bar(); }` -> `bar();`

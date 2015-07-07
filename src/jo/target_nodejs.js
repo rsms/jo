@@ -1,5 +1,6 @@
 import fs from 'asyncfs'
 import path from 'path'
+import {Unique} from './util'
 
 class NodeJSTarget extends Target {
   constructor(id, mode, options) {
@@ -122,6 +123,21 @@ class NodeJSTarget extends Target {
   }
 
 
+  genJOROOTInitCode(pkg:Pkg) {
+    let bakedJOROOT;
+    let dstDirAbs = path.dirname(path.resolve(this.programDstFile(pkg)));
+    if (dstDirAbs.indexOf(Env.JOROOT) === 0) {
+      bakedJOROOT = '__dirname+' +
+        JSON.stringify(path.relative(dstDirAbs, Env.JOROOT)).replace(/^"/, '"/');
+    } else {
+      bakedJOROOT = JSON.stringify(Env.JOROOT);
+    }
+    return 'process.env.JOROOT||require("path").' +
+      (bakedJOROOT === '__dirname+"/.."' ? 'dirname(__dirname)' :
+                                           'resolve(' + bakedJOROOT + ')');
+  }
+
+
   programBootCode(pkg:Pkg) {
     if (this._programBootCode && this._programBootCode.pkg === pkg) {
       return this._programBootCode.v;
@@ -133,34 +149,40 @@ class NodeJSTarget extends Target {
       nodeArgs += ' --stack-trace-limit=25';
     }
     let shebang = '#!/usr/bin/env node' + nodeArgs + '\n';
-    // header += '#!/usr/bin/env NODE_PATH=/Users/rasmus/src2/jo/pkg/npm node' + nodeArgs + '\n';
 
     // JOROOT to bake into source
-    let bakedJOROOT;
+    let rootInit = this.genJOROOTInitCode(pkg);
 
-    // Attempt relative path for same joroot
-    let dstDirAbs = path.dirname(path.resolve(this.programDstFile(pkg)));
-    if (dstDirAbs.indexOf(Env.JOROOT) === 0) {
-      bakedJOROOT = '__dirname+' +
-        JSON.stringify(path.relative(dstDirAbs, Env.JOROOT)).replace(/^"/, '"/');
-    } else {
-      bakedJOROOT = JSON.stringify(Env.JOROOT);
-    }
+    // Code: variables
+    let codeVars = `
+var __$r=function(){__$r=${rootInit};}
+,__$lrt=function(ref){
+  if(typeof __$r!=="string"){__$r();}
+  return require(__$r+"/node_modules/"+ref);
+}
+,__$i=global.__$i=function(m){return m && m.__esModule ? (m["default"] || m) : m; }
+,__$iw=global.__$iw=function(m){return m && m.__esModule ? m : {"default":m}; }
+    `.trim()+'\n';
 
-    let joRootJS = 'require("path").' +
-      (bakedJOROOT === '__dirname+"/.."' ? 'dirname(__dirname)' :
-                                           'resolve(' + bakedJOROOT + ')');
+    // Code: after variables
+    let codeRest = `
+global.__$irt=function(r){return __$i(__$lrt(r));};
+__$irt("source-map-support").install();
+    `.trim()+'\n';
 
-    // Import support functions
-    let code = `
-require("source-map-support").install();
-var __$fex=require("fs").existsSync
+    // Imports Jo packages?
+    let hasPkgImports = pkg.pkgInfo.imports && pkg.pkgInfo.imports.some(ref =>
+      ref[0] !== '.' && ref[0] !== '/' && !this.builtInModuleRefs[ref] );
+    if (hasPkgImports) {
+      codeVars += `
 ,__$p
+,__$fex=require("fs").existsSync
 ,__$lpkg=function(q,ref){
   var i,d,v;
   if(!__$p){
+    if(typeof __$r!=="string"){__$r();}
     d=${JSON.stringify('/pkg/'+this.pkgDirName+'/')};
-    __$p=[(process.env.JOROOT||${joRootJS})+d];
+    __$p=[__$r+d];
     if(v=process.env.JOPATH){
       v=v.split(":");
       for(i in v){
@@ -176,13 +198,15 @@ var __$fex=require("fs").existsSync
   }
   return q(ref);
 }
-,__$i=global.__$i=function(m){return m && m.__esModule ? (m["default"] || m) : m; }
-,__$iw=global.__$iw=function(m){return m && m.__esModule ? m : {"default":m}; };
+      `.trim()+'\n';
+      codeRest += `
 global.__$im=function(q,r){return __$i(__$lpkg(q,r));};
-global.__$irt=function(r){return __$i(require(r));};
 global.__$imw=function(q,r){return __$iw(__$lpkg(q,r));};
-    `;
+      `.trim()+'\n';
+    }
 
+    // Combine code
+    let code = codeVars.trim() + ';\n' + codeRest.trim();
     code = shebang + (this.isDevMode ? code.trim() :
                                        code.replace(/[ \t]*\r?\n[ \t]*/mg, ''));
 

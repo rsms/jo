@@ -45,7 +45,9 @@ var FileLocalVarsTransformer = {
   post(file) {
     // Rename remapped identifiers in this file
     Object.keys(file.joRemappedIdentifiers).forEach((oldName) => {
-      file.scope.rename(oldName, file.joRemappedIdentifiers[oldName]);
+      let newName = file.joRemappedIdentifiers[oldName];
+      //assert(file.scope.getBindingInfo(oldName) != undefined);
+      file.scope.rename(oldName, newName);
     });
 
     // dumpScopeBindings(file.scope);
@@ -67,7 +69,7 @@ var FileLocalVarsTransformer = {
     };
 
     // Attempt to automatically resolve any undefined references, like "React".
-    var verifyReference = (name, node, parent, scope) => {
+    var verifyReference = (name, node, parent, scope, isNewName:bool) => {
       if (!(node.name in file.joTarget.globals)) {
         var info = scope.getBindingInfo(node.name);
         if (!info) {
