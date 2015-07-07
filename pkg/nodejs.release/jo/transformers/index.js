@@ -1,4 +1,4 @@
-//#jopkg{"files":["class-hierarcy.js","file-local-vars.js","modules.js"],"imports":["../util","npmjs.com/babel"],"exports":["ClassHierarchyTransformer","ReferenceError","FileLocalVarsTransformer","ImportError","ModuleTransformer"],"babel-runtime":["core-js"],"version":"ibshhjez"}
+//#jopkg{"files":["class-hierarcy.js","file-local-vars.js","modules.js"],"imports":["../util","npmjs.com/babel"],"exports":["ClassHierarchyTransformer","ImportError","ModuleTransformer","ReferenceError","FileLocalVarsTransformer"],"babel-runtime":["core-js"],"version":"ibtld6mh"}
 var _core = __$irt("babel-runtime/core-js")
   , _$$0 = __$i(require("../util"))
   , _modules_js$repr = _$$0.repr
@@ -49,19 +49,6 @@ var ModuleTransformer = {
             spec.id._origName = spec.id.name;
             spec.name = file.joLocalizeIdentifier(spec.id.name);
           }
-          if (spec.type === "ImportBatchSpecifier") {
-            var rtHelperNode = {
-              _blockHoist: 3,
-              type: "ImportDeclaration",
-              specifiers: [{ type: "ImportSpecifier",
-                id: { type: "Identifier", name: "default" },
-                name: { type: "Identifier", name: "_interopRequireWildcard" } }],
-              source: { type: "Literal", value: "babel-runtime/helpers/interop-require-wildcard" },
-              jo_isRuntimeHelper: true };
-
-            file.scope.registerBinding("module", rtHelperNode);
-            file.joImports.push(rtHelperNode);
-          }
           spec.name._origName = origName;
           if (spec["default"]) {
             hasDefault = true;
@@ -72,16 +59,21 @@ var ModuleTransformer = {
         if (!_name || !_modules_js$JSIdentifier.isValid(_name)) {
           throw ImportError(file.jofile, node.source, "failed to infer module identifier");
         }
+
+        var spec = _modules_js$t.importSpecifier(null, _modules_js$t.identifier(_name));
+        spec["default"] = true;
+        node.specifiers = [spec];
+        file.scope.registerBinding("module", node);
+
         var id = file.joLocalizeIdentifier(_name);
-        node.specifiers = [_modules_js$t.importSpecifier(_modules_js$t.identifier("default"), id)];
-        node.specifiers[0]["default"] = true;
+        spec = _modules_js$t.importSpecifier(null, id);
+        spec["default"] = true;
+        node.specifiers = [spec];
       }
     }
 
     file.joImports.push(node);
-    try {
-      file.scope.registerBinding("module", node);
-    } catch (e) {}
+
     return [];
   },
 
@@ -170,7 +162,9 @@ var FileLocalVarsTransformer = {
 
   post: function post(file) {
     _core.Object.keys(file.joRemappedIdentifiers).forEach(function (oldName) {
-      file.scope.rename(oldName, file.joRemappedIdentifiers[oldName]);
+      var newName = file.joRemappedIdentifiers[oldName];
+
+      file.scope.rename(oldName, newName);
     });
 
     var undefinedSymbolResolvers = {
@@ -185,7 +179,7 @@ var FileLocalVarsTransformer = {
         return true;
       } };
 
-    var verifyReference = function (name, node, parent, scope) {
+    var verifyReference = function (name, node, parent, scope, isNewName) {
       if (!(node.name in file.joTarget.globals)) {
         var info = scope.getBindingInfo(node.name);
         if (!info) {
@@ -307,8 +301,8 @@ var ClassHierarchyTransformer = {
 
 };
 exports.ClassHierarchyTransformer = ClassHierarchyTransformer;
-exports.ReferenceError = ReferenceError;
-exports.FileLocalVarsTransformer = FileLocalVarsTransformer;
 exports.ImportError = ImportError;
 exports.ModuleTransformer = ModuleTransformer;
+exports.ReferenceError = ReferenceError;
+exports.FileLocalVarsTransformer = FileLocalVarsTransformer;
 //#sourceMappingURL=index.js.map

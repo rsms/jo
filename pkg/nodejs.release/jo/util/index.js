@@ -1,4 +1,4 @@
-//#jopkg{"files":["jsidentifier.js","levenshtein.js","parseopt.js","repr.js","srcerror.js","srclocation.js","termstyle.js","unique.js"],"imports":["util","path"],"exports":["RE","JSIdentifier","LevenshteinDistance","ParseOpt","repr","SrcError","SrcErrors","SrcLocation","SupportedTerms","TermStyle","Unique"],"babel-runtime":["core-js"],"version":"ibshhj5k"}
+//#jopkg{"files":["jsidentifier.js","levenshtein.js","parseopt.js","repr.js","srcerror.js","srclocation.js","termstyle.js","unique.js"],"imports":["util","path"],"exports":["RE","JSIdentifier","LevenshteinDistance","ParseOpt","repr","SrcError","SrcErrors","SrcLocation","SupportedTerms","TermStyle","Unique"],"babel-runtime":["core-js"],"version":"ibtld6dw"}
 var _core = __$irt("babel-runtime/core-js")
   , _repr_js$inspect = __$i(require("util")).inspect
   , _parseopt_js$path = __$i(require("path"));

@@ -1,4 +1,4 @@
-//#jopkg{"files":["msgparse.js","remotectrl.js"],"imports":[],"exports":["SentinelFramedMessageParser","RemoteControl"],"babel-runtime":["core-js"],"version":"ibshhjhl"}
+//#jopkg{"files":["msgparse.js","remotectrl.js"],"imports":[],"exports":["SentinelFramedMessageParser","RemoteControl"],"babel-runtime":["core-js"],"version":"ibtld6oa"}
 var _core = __$irt("babel-runtime/core-js");
 "use strict";
 

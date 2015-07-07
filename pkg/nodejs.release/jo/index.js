@@ -1,4 +1,4 @@
-//#jopkg{"files":["__DEV__.js","build.js","cmd-build.js","cmd-env.js","cmd-remotectrl.js","codebuf.js","compile.js","env.js","jo.js","logger.js","module.js","pkg.js","preprocessor.js","srcfile.js","target.js","target_browser.js","target_nodejs.js","tokenizer.js","toposort.js","workdir.js","writecode.js"],"imports":["asyncfs","path","os","./util","npmjs.com/source-map","npmjs.com/babel","npmjs.com/babel/lib/babel/transformation/file","npmjs.com/babel/lib/babel/transformation/transformer","npmjs.com/babel/lib/babel/generation","./transformers","./remotectrl"],"exports":["BuildCtx","EnvCmd","BuildCmd","RemoteControlCmd","CodeBuffer","ExportError","ReferenceError","CyclicReferenceError","PkgCompiler","Env","Mainv","Commands","Logger","Module","PrecompiledModule","Pkg","BuiltInPkg","NPMPkg","TokenEditor","Preprocessor","SrcFile","TARGET_BROWSER","TARGET_BROWSER_WEBKIT","TARGET_NODEJS","TARGET_MODE_DEV","TARGET_MODE_RELEASE","Targets","TargetOptions","GLOBAL_STD","GLOBAL_DEPRECATED","GLOBAL_UNSAFE","GLOBAL_EXPERIMENTAL","Target","BrowserTarget","NodeJSTarget","Tokenizer","WorkDir"],"babel-runtime":["helpers/async-to-generator","core-js","helpers/class-call-check","helpers/create-class","helpers/inherits","helpers/get","helpers/sliced-to-array","helpers/define-property","helpers/interop-require-wildcard"],"version":"ibshhiu5"}
+//#jopkg{"files":["build.js","cmd-build.js","cmd-env.js","cmd-remotectrl.js","codebuf.js","compile.js","env.js","jo.js","logger.js","module.js","pkg.js","preprocessor.js","srcfile.js","target.js","target_browser.js","target_nodejs.js","tokenizer.js","toposort.js","workdir.js","writecode.js"],"imports":["asyncfs","path","os","./util","npmjs.com/source-map","npmjs.com/babel","npmjs.com/babel/lib/babel/transformation/file","npmjs.com/babel/lib/babel/transformation/transformer","npmjs.com/babel/lib/babel/generation","./transformers","./remotectrl"],"exports":["BuildCmd","BuildCtx","EnvCmd","RemoteControlCmd","CodeBuffer","ExportError","ReferenceError","CyclicReferenceError","PkgCompiler","Env","Mainv","Commands","Logger","Module","PrecompiledModule","Pkg","BuiltInPkg","NPMPkg","TokenEditor","Preprocessor","SrcFile","TARGET_BROWSER","TARGET_BROWSER_WEBKIT","TARGET_NODEJS","TARGET_MODE_DEV","TARGET_MODE_RELEASE","Targets","TargetOptions","GLOBAL_STD","GLOBAL_DEPRECATED","GLOBAL_UNSAFE","GLOBAL_EXPERIMENTAL","Target","BrowserTarget","NodeJSTarget","Tokenizer","WorkDir"],"babel-runtime":["helpers/async-to-generator","core-js","helpers/class-call-check","helpers/create-class","helpers/inherits","helpers/get","helpers/sliced-to-array","helpers/define-property"],"version":"ibtld635"}
 var _asyncToGenerator = __$irt("babel-runtime/helpers/async-to-generator")
   , _core = __$irt("babel-runtime/core-js")
   , _classCallCheck = __$irt("babel-runtime/helpers/class-call-check")
@@ -7,15 +7,14 @@ var _asyncToGenerator = __$irt("babel-runtime/helpers/async-to-generator")
   , _get = __$irt("babel-runtime/helpers/get")
   , _slicedToArray = __$irt("babel-runtime/helpers/sliced-to-array")
   , _defineProperty = __$irt("babel-runtime/helpers/define-property")
-  , _interopRequireWildcard = __$irt("babel-runtime/helpers/interop-require-wildcard")
   , _writecode_js$fs = __$im(require,"asyncfs")
   , _workdir_js$fs = _writecode_js$fs
   , _module_js$fs = _writecode_js$fs
   , _env_js$fs = _writecode_js$fs
   , _target_nodejs_js$fs = _writecode_js$fs
   , _target_browser_js$fs = _writecode_js$fs
-  , _preprocessor_js$fs = _writecode_js$fs
   , _pkg_js$fs = _writecode_js$fs
+  , _preprocessor_js$fs = _writecode_js$fs
   , _compile_js$fs = _writecode_js$fs
   , _build_js$fs = _writecode_js$fs
   , _cmd_build_js$fs = _writecode_js$fs
@@ -34,10 +33,11 @@ var _asyncToGenerator = __$irt("babel-runtime/helpers/async-to-generator")
   , _$$0 = __$i(require("./util"))
   , _env_js$repr = _$$0.repr
   , _target_js$Unique = _$$0.Unique
+  , _target_nodejs_js$Unique = _$$0.Unique
+  , _pkg_js$SrcError = _$$0.SrcError
+  , _logger_js$TermStyle = _$$0.TermStyle
   , _toposort_js$repr = _$$0.repr
   , _preprocessor_js$repr = _$$0.repr
-  , _logger_js$TermStyle = _$$0.TermStyle
-  , _pkg_js$SrcError = _$$0.SrcError
   , _compile_js$JSIdentifier = _$$0.JSIdentifier
   , _compile_js$SrcError = _$$0.SrcError
   , _compile_js$SrcErrors = _$$0.SrcErrors
@@ -46,10 +46,10 @@ var _asyncToGenerator = __$irt("babel-runtime/helpers/async-to-generator")
   , _compile_js$Unique = _$$0.Unique
   , _compile_js$LevenshteinDistance = _$$0.LevenshteinDistance
   , _compile_js$TermStyle = _$$0.TermStyle
-  , _cmd_remotectrl_js$SrcError = _$$0.SrcError
   , _build_js$SrcLocation = _$$0.SrcLocation
   , _build_js$TermStyle = _$$0.TermStyle
   , _cmd_build_js$Unique = _$$0.Unique
+  , _cmd_remotectrl_js$SrcError = _$$0.SrcError
   , _jo_js$ParseOpt = _$$0.ParseOpt
   , _jo_js$SrcError = _$$0.SrcError
   , _codebuf_js$sourceMap = __$i(require("source-map"))
@@ -589,7 +589,7 @@ var Target = (function () {
         return _transformsWrapper;
       })(function (transforms) {
         if (this.mode === TARGET_MODE_RELEASE) {
-          transforms = transforms.concat(["utility.removeConsole", "utility.removeDebugger", "utility.deadCodeElimination"]);
+          transforms = transforms.concat(["utility.removeDebugger", "utility.deadCodeElimination"]);
         }
 
         return transforms;
@@ -792,8 +792,22 @@ var NodeJSTarget = (function (_Target) {
         }
       }
     },
+    genJOROOTInitCode: {
+      value: function genJOROOTInitCode(pkg) {
+        var bakedJOROOT = undefined;
+        var dstDirAbs = _target_nodejs_js$path.dirname(_target_nodejs_js$path.resolve(this.programDstFile(pkg)));
+        if (dstDirAbs.indexOf(Env.JOROOT) === 0) {
+          bakedJOROOT = "__dirname+" + JSON.stringify(_target_nodejs_js$path.relative(dstDirAbs, Env.JOROOT)).replace(/^"/, "\"/");
+        } else {
+          bakedJOROOT = JSON.stringify(Env.JOROOT);
+        }
+        return "process.env.JOROOT||require(\"path\")." + (bakedJOROOT === "__dirname+\"/..\"" ? "dirname(__dirname)" : "resolve(" + bakedJOROOT + ")");
+      }
+    },
     programBootCode: {
       value: function programBootCode(pkg) {
+        var _this = this;
+
         if (this._programBootCode && this._programBootCode.pkg === pkg) {
           return this._programBootCode.v;
         }
@@ -804,19 +818,21 @@ var NodeJSTarget = (function (_Target) {
         }
         var shebang = "#!/usr/bin/env node" + nodeArgs + "\n";
 
-        var bakedJOROOT = undefined;
+        var rootInit = this.genJOROOTInitCode(pkg);
 
-        var dstDirAbs = _target_nodejs_js$path.dirname(_target_nodejs_js$path.resolve(this.programDstFile(pkg)));
-        if (dstDirAbs.indexOf(Env.JOROOT) === 0) {
-          bakedJOROOT = "__dirname+" + JSON.stringify(_target_nodejs_js$path.relative(dstDirAbs, Env.JOROOT)).replace(/^"/, "\"/");
-        } else {
-          bakedJOROOT = JSON.stringify(Env.JOROOT);
+        var codeVars = ("\nvar __$r=function(){__$r=" + rootInit + ";}\n,__$lrt=function(ref){\n  if(typeof __$r!==\"string\"){__$r();}\n  return require(__$r+\"/node_modules/\"+ref);\n}\n,__$i=global.__$i=function(m){return m && m.__esModule ? (m[\"default\"] || m) : m; }\n,__$iw=global.__$iw=function(m){return m && m.__esModule ? m : {\"default\":m}; }\n    ").trim() + "\n";
+
+        var codeRest = "\nglobal.__$irt=function(r){return __$i(__$lrt(r));};\n__$irt(\"source-map-support\").install();\n    ".trim() + "\n";
+
+        var hasPkgImports = pkg.pkgInfo.imports && pkg.pkgInfo.imports.some(function (ref) {
+          return ref[0] !== "." && ref[0] !== "/" && !_this.builtInModuleRefs[ref];
+        });
+        if (hasPkgImports) {
+          codeVars += ("\n,__$p\n,__$fex=require(\"fs\").existsSync\n,__$lpkg=function(q,ref){\n  var i,d,v;\n  if(!__$p){\n    if(typeof __$r!==\"string\"){__$r();}\n    d=" + JSON.stringify("/pkg/" + this.pkgDirName + "/") + ";\n    __$p=[__$r+d];\n    if(v=process.env.JOPATH){\n      v=v.split(\":\");\n      for(i in v){\n        if(v[i])__$p.push(v[i]+d);\n      }\n    }\n  }\n  for(i in __$p){\n    d=__$p[i]+ref+\"/index.js\";\n    if(__$fex(d)){\n      return q(d);\n    }\n  }\n  return q(ref);\n}\n      ").trim() + "\n";
+          codeRest += "\nglobal.__$im=function(q,r){return __$i(__$lpkg(q,r));};\nglobal.__$imw=function(q,r){return __$iw(__$lpkg(q,r));};\n      ".trim() + "\n";
         }
 
-        var joRootJS = "require(\"path\")." + (bakedJOROOT === "__dirname+\"/..\"" ? "dirname(__dirname)" : "resolve(" + bakedJOROOT + ")");
-
-        var code = "\nrequire(\"source-map-support\").install();\nvar __$fex=require(\"fs\").existsSync\n,__$p\n,__$lpkg=function(q,ref){\n  var i,d,v;\n  if(!__$p){\n    d=" + JSON.stringify("/pkg/" + this.pkgDirName + "/") + ";\n    __$p=[(process.env.JOROOT||" + joRootJS + ")+d];\n    if(v=process.env.JOPATH){\n      v=v.split(\":\");\n      for(i in v){\n        if(v[i])__$p.push(v[i]+d);\n      }\n    }\n  }\n  for(i in __$p){\n    d=__$p[i]+ref+\"/index.js\";\n    if(__$fex(d)){\n      return q(d);\n    }\n  }\n  return q(ref);\n}\n,__$i=global.__$i=function(m){return m && m.__esModule ? (m[\"default\"] || m) : m; }\n,__$iw=global.__$iw=function(m){return m && m.__esModule ? m : {\"default\":m}; };\nglobal.__$im=function(q,r){return __$i(__$lpkg(q,r));};\nglobal.__$irt=function(r){return __$i(require(r));};\nglobal.__$imw=function(q,r){return __$iw(__$lpkg(q,r));};\n    ";
-
+        var code = codeVars.trim() + ";\n" + codeRest.trim();
         code = shebang + (this.isDevMode ? code.trim() : code.replace(/[ \t]*\r?\n[ \t]*/mg, ""));
 
         this._programBootCode = { pkg: pkg, v: code };
@@ -1529,236 +1545,6 @@ function Tokenizer(code) {
 }
 "use strict";
 
-function toposort(edges) {
-  return _toposort(uniqueNodes(edges), edges);
-}
-
-function _toposort(nodes, edges) {
-  var cursor = nodes.length,
-      sorted = new Array(cursor),
-      visited = {},
-      i = cursor;
-
-  while (i--) {
-    if (!visited[i]) {
-      visit(nodes[i], i, []);
-    }
-  }
-
-  return sorted;
-
-  function visit(node, i, predecessors) {
-    if (predecessors.indexOf(node) >= 0) {
-      return;
-    }
-
-    if (visited[i]) {
-      return;
-    }visited[i] = true;
-
-    var outgoing = edges.filter(function (edge) {
-      return edge[0] === node;
-    });
-    if (i = outgoing.length) {
-      var preds = predecessors.concat(node);
-      do {
-        var child = outgoing[--i][1];
-        visit(child, nodes.indexOf(child), preds);
-      } while (i);
-    }
-
-    sorted[--cursor] = node;
-  }
-}
-
-function uniqueNodes(arr) {
-  var res = [];
-  for (var i = 0, len = arr.length; i < len; i++) {
-    var edge = arr[i];
-    if (res.indexOf(edge[0]) < 0) res.push(edge[0]);
-    if (res.indexOf(edge[1]) < 0) res.push(edge[1]);
-  }
-  return res;
-}
-"use strict";
-
-var TokenEditor = (function () {
-  function TokenEditor(tokenizer, srcfile, visitor) {
-    _classCallCheck(this, TokenEditor);
-
-    this.tokenizer = tokenizer;
-    this.srcfile = srcfile;
-    this.visitor = visitor;
-  }
-
-  _createClass(TokenEditor, {
-    nextToken: {
-      value: function nextToken() {
-        var t = this.tokenizer.next();
-        return t.done ? null : t.value;
-      }
-    },
-    edit: {
-      value: function edit() {
-        var tok,
-            tokens,
-            dstCode = "";
-
-        while (tok = this.nextToken()) {
-          tokens = this.visitor(tok, this);
-          if (tokens) {}
-
-          var chunk = this.srcfile.code.substring(tok.range[0], tok.range[1]);
-
-          dstCode += chunk;
-        }
-
-        return [this.srcfile.code, null];
-      }
-    }
-  });
-
-  return TokenEditor;
-})();
-
-var Preprocessor = (function () {
-  function Preprocessor() {
-    _classCallCheck(this, Preprocessor);
-
-    this.codebuf = null;
-  }
-
-  _createClass(Preprocessor, {
-    process: {
-      value: function process(srcfile) {
-        var editor = new TokenEditor(Tokenizer(srcfile.code), srcfile, function (token, editor) {
-          if (token.type === "record") {}
-        });
-        return editor.edit();
-      }
-    }
-  });
-
-  return Preprocessor;
-})();
-"use strict";
-
-var Logger = (function () {
-  function Logger(level) {
-    var _this = this;
-
-    _classCallCheck(this, Logger);
-
-    this.level = level;
-    var So = this.style = _logger_js$TermStyle.stdout;
-    var Se = this.errstyle = _logger_js$TermStyle.stderr;
-    var werr = function werr(style, args) {
-      process.stderr.write(style.open);
-      console.error.apply(console, args);
-      process.stderr.write(style.close);
-    };
-    if (level >= Logger.DEBUG) {
-      this.debug = function () {
-        for (var _len = arguments.length, args = Array(_len), _key = 0; _key < _len; _key++) {
-          args[_key] = arguments[_key];
-        }
-
-        console.log.apply(console, args);
-      };
-    }
-    if (level >= Logger.INFO) {
-      this.info = function () {
-        for (var _len = arguments.length, args = Array(_len), _key = 0; _key < _len; _key++) {
-          args[_key] = arguments[_key];
-        }
-
-        console.log.apply(console, args);
-      };
-    }
-    if (level >= Logger.WARN) {
-      this.warn = function () {
-        for (var _len = arguments.length, args = Array(_len), _key = 0; _key < _len; _key++) {
-          args[_key] = arguments[_key];
-        }
-
-        console.log.apply(console, args);
-      };
-    }
-    if (level >= Logger.ERROR) {
-      this.error = function () {
-        for (var _len = arguments.length, args = Array(_len), _key = 0; _key < _len; _key++) {
-          args[_key] = arguments[_key];
-        }
-
-        werr(So.boldRed, args);
-      };
-    }
-    this.verbosityMap = (function () {
-      var _verbosityMap = {};
-
-      _defineProperty(_verbosityMap, _this.DEBUG, _this.debug.bind(_this));
-
-      _defineProperty(_verbosityMap, _this.INFO, _this.info.bind(_this));
-
-      _defineProperty(_verbosityMap, _this.WARN, _this.warn.bind(_this));
-
-      _defineProperty(_verbosityMap, _this.ERROR, _this.error.bind(_this));
-
-      return _verbosityMap;
-    })();
-  }
-
-  _createClass(Logger, {
-    debug: {
-      value: function debug() {
-        for (var _len = arguments.length, _ = Array(_len), _key = 0; _key < _len; _key++) {
-          _[_key] = arguments[_key];
-        }
-      }
-    },
-    info: {
-      value: function info() {
-        for (var _len = arguments.length, _ = Array(_len), _key = 0; _key < _len; _key++) {
-          _[_key] = arguments[_key];
-        }
-      }
-    },
-    warn: {
-      value: function warn() {
-        for (var _len = arguments.length, _ = Array(_len), _key = 0; _key < _len; _key++) {
-          _[_key] = arguments[_key];
-        }
-      }
-    },
-    error: {
-      value: function error() {
-        for (var _len = arguments.length, _ = Array(_len), _key = 0; _key < _len; _key++) {
-          _[_key] = arguments[_key];
-        }
-      }
-    },
-    log: {
-      value: function log(verbosity) {
-        var _verbosityMap;
-
-        for (var _len = arguments.length, args = Array(_len > 1 ? _len - 1 : 0), _key = 1; _key < _len; _key++) {
-          args[_key - 1] = arguments[_key];
-        }
-
-        (_verbosityMap = this.verbosityMap)[verbosity].apply(_verbosityMap, args);
-      }
-    }
-  });
-
-  return Logger;
-})();
-
-Logger.DEBUG = 3;
-Logger.INFO = 2;
-Logger.WARN = 1;
-Logger.ERROR = 0;
-"use strict";
-
 var SrcFile = (function () {
   function SrcFile() {
     _classCallCheck(this, SrcFile);
@@ -2023,6 +1809,240 @@ NPMPkg.stripNPMRefPrefix = function (ref) {
 };
 "use strict";
 
+var Logger = (function () {
+  function Logger(level) {
+    var _this = this;
+
+    _classCallCheck(this, Logger);
+
+    this.level = level;
+    var So = this.style = _logger_js$TermStyle.stdout;
+    var Se = this.errstyle = _logger_js$TermStyle.stderr;
+    var werr = function werr(style, args) {
+      process.stderr.write(style.open);
+      console.error.apply(console, args);
+      process.stderr.write(style.close);
+    };
+    if (level >= Logger.DEBUG) {
+      this.debug = function () {
+        for (var _len = arguments.length, args = Array(_len), _key = 0; _key < _len; _key++) {
+          args[_key] = arguments[_key];
+        }
+
+        console.log.apply(console, args);
+      };
+    }
+    if (level >= Logger.INFO) {
+      this.info = function () {
+        for (var _len = arguments.length, args = Array(_len), _key = 0; _key < _len; _key++) {
+          args[_key] = arguments[_key];
+        }
+
+        console.log.apply(console, args);
+      };
+    }
+    if (level >= Logger.WARN) {
+      this.warn = function () {
+        for (var _len = arguments.length, args = Array(_len), _key = 0; _key < _len; _key++) {
+          args[_key] = arguments[_key];
+        }
+
+        console.log.apply(console, args);
+      };
+    }
+    if (level >= Logger.ERROR) {
+      this.error = function () {
+        for (var _len = arguments.length, args = Array(_len), _key = 0; _key < _len; _key++) {
+          args[_key] = arguments[_key];
+        }
+
+        werr(So.boldRed, args);
+      };
+    }
+    this.verbosityMap = (function () {
+      var _verbosityMap = {};
+
+      _defineProperty(_verbosityMap, _this.DEBUG, _this.debug.bind(_this));
+
+      _defineProperty(_verbosityMap, _this.INFO, _this.info.bind(_this));
+
+      _defineProperty(_verbosityMap, _this.WARN, _this.warn.bind(_this));
+
+      _defineProperty(_verbosityMap, _this.ERROR, _this.error.bind(_this));
+
+      return _verbosityMap;
+    })();
+  }
+
+  _createClass(Logger, {
+    debug: {
+      value: function debug() {
+        for (var _len = arguments.length, _ = Array(_len), _key = 0; _key < _len; _key++) {
+          _[_key] = arguments[_key];
+        }
+      }
+    },
+    info: {
+      value: function info() {
+        for (var _len = arguments.length, _ = Array(_len), _key = 0; _key < _len; _key++) {
+          _[_key] = arguments[_key];
+        }
+      }
+    },
+    warn: {
+      value: function warn() {
+        for (var _len = arguments.length, _ = Array(_len), _key = 0; _key < _len; _key++) {
+          _[_key] = arguments[_key];
+        }
+      }
+    },
+    error: {
+      value: function error() {
+        for (var _len = arguments.length, _ = Array(_len), _key = 0; _key < _len; _key++) {
+          _[_key] = arguments[_key];
+        }
+      }
+    },
+    log: {
+      value: function log(verbosity) {
+        var _verbosityMap;
+
+        for (var _len = arguments.length, args = Array(_len > 1 ? _len - 1 : 0), _key = 1; _key < _len; _key++) {
+          args[_key - 1] = arguments[_key];
+        }
+
+        (_verbosityMap = this.verbosityMap)[verbosity].apply(_verbosityMap, args);
+      }
+    }
+  });
+
+  return Logger;
+})();
+
+Logger.DEBUG = 3;
+Logger.INFO = 2;
+Logger.WARN = 1;
+Logger.ERROR = 0;
+"use strict";
+
+function toposort(edges) {
+  return _toposort(uniqueNodes(edges), edges);
+}
+
+function _toposort(nodes, edges) {
+  var cursor = nodes.length,
+      sorted = new Array(cursor),
+      visited = {},
+      i = cursor;
+
+  while (i--) {
+    if (!visited[i]) {
+      visit(nodes[i], i, []);
+    }
+  }
+
+  return sorted;
+
+  function visit(node, i, predecessors) {
+    if (predecessors.indexOf(node) >= 0) {
+      return;
+    }
+
+    if (visited[i]) {
+      return;
+    }visited[i] = true;
+
+    var outgoing = edges.filter(function (edge) {
+      return edge[0] === node;
+    });
+    if (i = outgoing.length) {
+      var preds = predecessors.concat(node);
+      do {
+        var child = outgoing[--i][1];
+        visit(child, nodes.indexOf(child), preds);
+      } while (i);
+    }
+
+    sorted[--cursor] = node;
+  }
+}
+
+function uniqueNodes(arr) {
+  var res = [];
+  for (var i = 0, len = arr.length; i < len; i++) {
+    var edge = arr[i];
+    if (res.indexOf(edge[0]) < 0) res.push(edge[0]);
+    if (res.indexOf(edge[1]) < 0) res.push(edge[1]);
+  }
+  return res;
+}
+"use strict";
+
+var TokenEditor = (function () {
+  function TokenEditor(tokenizer, srcfile, visitor) {
+    _classCallCheck(this, TokenEditor);
+
+    this.tokenizer = tokenizer;
+    this.srcfile = srcfile;
+    this.visitor = visitor;
+  }
+
+  _createClass(TokenEditor, {
+    nextToken: {
+      value: function nextToken() {
+        var t = this.tokenizer.next();
+        return t.done ? null : t.value;
+      }
+    },
+    edit: {
+      value: function edit() {
+        var tok,
+            tokens,
+            dstCode = "";
+
+        while (tok = this.nextToken()) {
+          tokens = this.visitor(tok, this);
+          if (tokens) {}
+
+          var chunk = this.srcfile.code.substring(tok.range[0], tok.range[1]);
+          console.log("token:", tok.type, _preprocessor_js$repr(chunk), tok.value ? _preprocessor_js$repr(tok.value) : "-", "" + tok.loc.start.line + ":" + tok.loc.start.column + "–" + tok.loc.end.line + ":" + tok.loc.end.column);
+          dstCode += chunk;
+        }
+
+        console.log(dstCode);
+
+        return [this.srcfile.code, null];
+      }
+    }
+  });
+
+  return TokenEditor;
+})();
+
+var Preprocessor = (function () {
+  function Preprocessor() {
+    _classCallCheck(this, Preprocessor);
+
+    this.codebuf = null;
+  }
+
+  _createClass(Preprocessor, {
+    process: {
+      value: function process(srcfile) {
+        var editor = new TokenEditor(Tokenizer(srcfile.code), srcfile, function (token, editor) {
+          if (token.type === "record") {
+            console.log("Record!");
+          }
+        });
+        return editor.edit();
+      }
+    }
+  });
+
+  return Preprocessor;
+})();
+"use strict";
+
 var CodeBuffer = (function () {
   function CodeBuffer(sourceDir, target) {
     _classCallCheck(this, CodeBuffer);
@@ -2064,8 +2084,19 @@ var CodeBuffer = (function () {
         var lines = code.split(/\r?\n/);
         this.code += code + "\n";
         this.line += lines.length + 1;
+        var genStart = { line: startLine, column: 1 };
+        var genEnd = { line: this.line, column: lines[lines.length - 1].length };
         if (srcloc) {
-          this.addSrcLocMapping(srcloc, srcfilename, { line: startLine, column: 1 }, { line: this.line, column: lines[lines.length - 1].length });
+          this.addSrcLocMapping(srcloc, srcfilename, genStart, genEnd);
+        } else if (srcfilename) {
+          this.map.addMapping({
+            original: { line: 1, column: 1 },
+            generated: genStart,
+            source: srcfilename });
+          this.map.addMapping({
+            original: { line: lines.length, column: 1 },
+            generated: genEnd,
+            source: srcfilename });
         }
       }
     },
@@ -3328,53 +3359,6 @@ var PkgCompiler = (function () {
 })();
 "use strict";
 
-var RemoteControlCmd = {
-  desc: "Control Jo from another process",
-  usage: "[-pid <pid>]\n\nOptions:\n{{options}}\n\n-pid <pid>\n  When -pid is provided, Jo will send heartbeat SIGCHLD signals to <pid> at\n  regular intervals. When such a heartbeat fail to deliver, the Jo process will\n  exit(1). This provides \"zombie\" protection i.e. when parent process crashes.\n\nCommunication\n  Remote-control mode uses stdio to communicate using JSON messages separated\n  by <LF> ('\\n'). When stdin closes, the Jo process will exit(0).\n\n  Sending an illegal command or arguments causes the Jo process to exit(1).\n\n  Caveats when issuing multiple concurrent commands:\n    - You should include an \"id\" property with some value that is unique to the\n      command request.\n    - Log messages will _not_ include an \"id\" and might be out-of order.\n    - When receiving a \"result\" message, you should compare its \"id\" property\n      to some internal set of \"pending requests\" to know what command request\n      actually finished.\n\nExample:\n  $ echo '{\"type\":\"runcmd\",\"id\":1,\"args\":[\"build\", \"foo\"]}' | {{prog}}\n  {\"type\":\"log\",\"id\":1,level\":\"i\",\"message\":\"building package foo\"}\n  ...\n  {\"type\":\"result\",\"id\":1,\"error\":\"no source files found in package \"foo\"\"}\n\n",
-  options: {
-    pid: "<pid> Parent process identifier" },
-  main: _asyncToGenerator(function* (opts, args, usage, cb) {
-    var sendResult = function (err, id) {
-      var r = { type: "result" };
-      if (id !== undefined) {
-        r.id = id;
-      }
-      if (err) {
-        r.error = err.description || (err.stack ? err.stack.split(/\n+/)[0] : String(err));
-        r.diagnostics = _cmd_remotectrl_js$SrcError.makeDiagnostics(err);
-      }
-      process.send(r);
-      if (err) {}
-    };
-
-    yield _cmd_remotectrl_js$RemoteControl(opts.pid, function (msg, cb) {
-      if (msg.type === "runcmd") {
-        var f = function (err) {
-          sendResult(err, msg.id);
-          cb();
-        };
-        Mainv(process.argv.slice(0, 2).concat(msg.args)).then(f)["catch"](f);
-      } else {
-        sendResult("unknown remote message \"" + msg.type + "\"");
-        cb();
-      }
-    });
-  }) };
-"use strict";
-
-var EnvCmd = {
-  desc: "Prints Jo environment information",
-  main: _asyncToGenerator(function* (opts, args, usage) {
-
-    for (var k in Env) {
-      if (k === k.toUpperCase()) {
-        var v = typeof Env[k] === "string" ? Env[k] : Env.format(Env[k]);
-        process.stdout.write(k + "=" + JSON.stringify(v) + "\n");
-      }
-    }
-  }) };
-"use strict";
-
 var kSpaces = "                                                                              ";
 var slice = Array.prototype.slice;
 
@@ -3699,7 +3683,9 @@ var BuildCmd = {
       return arg.trim();
     }));
 
-    if (!opts.work) {
+    if (opts.work) {
+      console.log("workdir:", WorkDir.path);
+    } else {
       WorkDir.enableRemoveAtExit();
     }
 
@@ -3752,6 +3738,57 @@ function _cmd_build_js$init() {
     return params[k];
   });
 }
+"use strict";
+
+var RemoteControlCmd = {
+  desc: "Control Jo from another process",
+  usage: "[-pid <pid>]\n\nOptions:\n{{options}}\n\n-pid <pid>\n  When -pid is provided, Jo will send heartbeat SIGCHLD signals to <pid> at\n  regular intervals. When such a heartbeat fail to deliver, the Jo process will\n  exit(1). This provides \"zombie\" protection i.e. when parent process crashes.\n\nCommunication\n  Remote-control mode uses stdio to communicate using JSON messages separated\n  by <LF> ('\\n'). When stdin closes, the Jo process will exit(0).\n\n  Sending an illegal command or arguments causes the Jo process to exit(1).\n\n  Caveats when issuing multiple concurrent commands:\n    - You should include an \"id\" property with some value that is unique to the\n      command request.\n    - Log messages will _not_ include an \"id\" and might be out-of order.\n    - When receiving a \"result\" message, you should compare its \"id\" property\n      to some internal set of \"pending requests\" to know what command request\n      actually finished.\n\nExample:\n  $ echo '{\"type\":\"runcmd\",\"id\":1,\"args\":[\"build\", \"foo\"]}' | {{prog}}\n  {\"type\":\"log\",\"id\":1,level\":\"i\",\"message\":\"building package foo\"}\n  ...\n  {\"type\":\"result\",\"id\":1,\"error\":\"no source files found in package \"foo\"\"}\n\n",
+  options: {
+    pid: "<pid> Parent process identifier" },
+  main: _asyncToGenerator(function* (opts, args, usage, cb) {
+    var sendResult = function (err, id) {
+      var r = { type: "result" };
+      if (id !== undefined) {
+        r.id = id;
+      }
+      if (err) {
+        r.error = err.description || (err.stack ? err.stack.split(/\n+/)[0] : String(err));
+        r.diagnostics = _cmd_remotectrl_js$SrcError.makeDiagnostics(err);
+      }
+      process.send(r);
+      if (err) {
+        console.error(err.stack || String(err));
+      }
+    };
+
+    yield _cmd_remotectrl_js$RemoteControl(opts.pid, function (msg, cb) {
+      if (msg.type === "runcmd") {
+        var f = function (err) {
+          sendResult(err, msg.id);
+          cb();
+        };
+        Mainv(process.argv.slice(0, 2).concat(msg.args)).then(f)["catch"](f);
+      } else {
+        sendResult("unknown remote message \"" + msg.type + "\"");
+        cb();
+      }
+    });
+
+    console.log("remote control exited");
+  }) };
+"use strict";
+
+var EnvCmd = {
+  desc: "Prints Jo environment information",
+  main: _asyncToGenerator(function* (opts, args, usage) {
+
+    for (var k in Env) {
+      if (k === k.toUpperCase()) {
+        var v = typeof Env[k] === "string" ? Env[k] : Env.format(Env[k]);
+        process.stdout.write(k + "=" + JSON.stringify(v) + "\n");
+      }
+    }
+  }) };
 "use strict";
 
 var Mainv = _asyncToGenerator(function* (argv) {
@@ -3847,16 +3884,13 @@ function _jo_js$init() {
   }).join("\n");
   usage = usage.replace(/\{\{commands\}\}/g, commandsUsage);
 }
-"use strict";
-
-var __DEV__ = true;
 _target_nodejs_js$init();
 _target_browser_js$init();
 _cmd_build_js$init();
 _jo_js$init();
+exports.BuildCmd = BuildCmd;
 exports.BuildCtx = BuildCtx;
 exports.EnvCmd = EnvCmd;
-exports.BuildCmd = BuildCmd;
 exports.RemoteControlCmd = RemoteControlCmd;
 exports.CodeBuffer = CodeBuffer;
 exports.ExportError = ExportError;
