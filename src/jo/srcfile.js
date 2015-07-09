@@ -12,8 +12,7 @@
 class SrcFile {
 
   // Returns true if filename might be a source file
-  // (filename:string):bool
-  static filenameMatches(filename) {
+  static filenameMatches(filename:string) {
     return filename.match(/^[^\.].*\.js$/);
   }
 

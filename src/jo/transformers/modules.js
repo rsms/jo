@@ -7,35 +7,38 @@
 //   node:ASTNode                    // the import node
 // }
 import {repr, JSIdentifier, SrcError, SrcLocation} from '../util'
-import {types as t} from 'npmjs.com/babel'
-var __DEV__ = true; // FIXME remove when we build ourselves
+import {types as t} from 'npmjs.com/babel-core'
 
 function ImportError(file, node, message, fixSuggestion, related) {
   return SrcError('ImportError', SrcLocation(node, file), message, fixSuggestion, related);
 }
 
-
 var implicitExportNameRe = /^[A-Z]/u;
   // TODO: Add all upper-case Unicode letters to the regex, e.g. \uXXXX-\uXXXX ...
-
 function isImplicitExportName(name) {
   return name.match(implicitExportNameRe) //&& (name[0] === name[0].toUpperCase());
 }
 
 
-var ModuleTransformer = {
+function Modules({ Plugin, types: t }) {
+  return new Plugin("jo.modules", { visitor: visit })
+}
 
+var visit = {
   ImportDeclaration(node, parent, scope, file) {
     if (node.isType) return;
+    var jo:CompileContext = this.state.opts._joctx;
 
     if (node.range && node.range[0] > file.joFirstNonImportOffset) {
-      throw ImportError(file.jofile, node, 'unexpected import below non-import statement');
+      throw ImportError(jo.file, node, 'unexpected import below non-import statement');
     }
 
     // Note: Imports are only at "program" level, enforced by the parser,
     // so no need to check parent.type==='Program'.
 
-    if (node.source.value.substr(0,14) === 'babel-runtime/') {
+    console.log('node.source', repr(node.source,2))
+
+    if (node.source.value && node.source.value.substr(0,14) === 'babel-runtime/') {
       //console.log('runtime-helper', repr(node,3));
       node.jo_isRuntimeHelper = true;
     } else {
@@ -44,15 +47,15 @@ var ModuleTransformer = {
         for (let i = 0, L = node.specifiers.length; i !== L; ++i) {
           let spec = node.specifiers[i];
           let origName;
-          if (spec.name) {
+          console.log('spec', repr(spec,2));
+          if (spec.imported !== spec.local) {
             // x as y
-            origName = spec.name.name;
-            spec.name = file.joLocalizeIdentifier(spec.name.name)
+            origName = spec.local;
+            spec.local = file.joLocalizeIdentifier(spec.name.name)
           } else {
             origName = spec.id.name;
             spec.id._origName = spec.id.name;
             spec.name = file.joLocalizeIdentifier(spec.id.name)
-            // console.log('spec', repr(spec,3)); // path
           }
           spec.name._origName = origName; // because scope.rename() later on
           if (spec.default) {

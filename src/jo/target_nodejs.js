@@ -92,6 +92,15 @@ class NodeJSTarget extends Target {
     ])
   }
 
+  disabledTransforms(disabledTransforms) {
+    return super.disabledTransforms(disabledTransforms).concat([
+      'spec.protoToAssign', // x.__proto__ = y supported by v8, no need to shallow-copy
+      'es6.spec.blockScoping', // supported by v8
+      'es6.spec.symbols', // supported by v8
+      'regenerator', // yield is supported by v8
+    ])
+  }
+
 
   // Program destination
   programDstFile(pkg:Pkg) {

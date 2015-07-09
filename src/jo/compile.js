@@ -1,14 +1,15 @@
 import fs from 'asyncfs'
 import path from 'path'
-import * as babel from 'npmjs.com/babel'
-import BabelFile from 'npmjs.com/babel/lib/babel/transformation/file';
-import Transformer from 'npmjs.com/babel/lib/babel/transformation/transformer'
-import BabelGen from 'npmjs.com/babel/lib/babel/generation'
-import {
-  ModuleTransformer,
-  FileLocalVarsTransformer,
-  ClassHierarchyTransformer
-} from './transformers'
+import * as babel from 'npmjs.com/babel-core'
+//import BabelFile from 'npmjs.com/babel/lib/babel/transformation/file';
+// import Transformer from 'npmjs.com/babel/lib/babel/transformation/transformer'
+// import BabelGen from 'npmjs.com/babel/lib/babel/generation'
+import plugins from './transformers'
+// {
+//   ModulePlugIn,
+//   FileLocalVarsTransformer,
+//   ClassHierarchyTransformer
+// } from 
 import {
   JSIdentifier,
   SrcError,
@@ -21,12 +22,12 @@ import {
 } from './util'
 
 // Register jo transformers (wish there was a non-mutating API for this)
-babel.transform.transformers['jo.classes'] =
-  new Transformer('jo.classes', ClassHierarchyTransformer);
-babel.transform.transformers['jo.modules'] =
-  new Transformer('jo.modules', ModuleTransformer);
-babel.transform.transformers['jo.fileLocalVars'] =
-  new Transformer('jo.fileLocalVars', FileLocalVarsTransformer);
+// babel.transform.transformers['jo.classes'] =
+//   new Transformer('jo.classes', ClassHierarchyTransformer);
+// babel.transform.transformers['jo.modules'] =
+//   new Transformer('jo.modules', ModuleTransformer);
+// babel.transform.transformers['jo.fileLocalVars'] =
+//   new Transformer('jo.fileLocalVars', FileLocalVarsTransformer);
 
 function ExportError(file, node, message, fixSuggestion, related) {
   return SrcError('ExportError', SrcLocation(node, file), message, fixSuggestion, related);
@@ -354,6 +355,7 @@ class PkgCompiler {
 
 
   codegen(ast) {
+    var BabelGen = function() { console.warn('TODO BabelGen'); return {code:'TODO BabelGen'} };
     return BabelGen(ast, {
       code:              true,
       ast:               false,
@@ -391,32 +393,82 @@ class PkgCompiler {
 
   // parseFile(srcfile:SrcFile, code:string, inSourceMap:SourceMap):ParseResult
   parseFile(srcfile, code, inSourceMap) {
-    var bopts = {
-      filename:          srcfile.name,
-      inputSourceMap:    inSourceMap,
-      sourceMap:         true,     // generate SourceMap
-      sourceMapName:     'out.map',
-      sourceRoot:        srcfile.dir,
-      code:              true,     // output JavaScript code
-      ast:               false,    // output AST
-      experimental:      true,     // enable things like ES7 features
-      compact:           false,//this.target.mode === TARGET_MODE_RELEASE,   // "minify"
-                               //^ [BUG] true: broken in babel 4.7.16 (concats "yield" and "new")
-      comments:          this.target.mode === TARGET_MODE_DEV,  // include comments in output
-      returnUsedHelpers: false,    // return information on what helpers are needed/was added
-      modules:           'ignore',
-      blacklist:         this.target.disabledTransforms(['es6.modules']),
-      optional:          this.target.transforms([
-        'jo.modules',  // must be first
-        'runtime',
-      ]).concat([
-        'jo.classes',
-        'jo.fileLocalVars', // must be last
+    this.log.debug('parse', this.pkg.id, '/', srcfile.name);
+
+    // Babel options (http://babeljs.io/docs/usage/options/)
+    var babelOptions = {
+      filename:            srcfile.name,
+      inputSourceMap:      inSourceMap,
+      sourceMaps:          true,     // generate SourceMap
+      sourceMapTarget:     'out.map',
+      sourceRoot:          srcfile.dir,
+      code:                true,     // output JavaScript code
+      ast:                 false,    // output AST
+      compact:             false,//this.target.mode === TARGET_MODE_RELEASE,   // "minify"
+                                 //^ [BUG] true: broken in babel 4.7.16 (concats "yield" and "new")
+      comments:            this.target.mode === TARGET_MODE_DEV,  // include comments in output
+      metadataUsedHelpers: false,    // return information on what helpers are needed/was added
+      modules:             'ignore',
+      externalHelpers:     true,
+      experimental:        true,
+      stage:               0, // 0=strawman 1=proposal 2=draft 3=candidate 4=finished. TODO config
+
+      // See http://babeljs.io/docs/advanced/transformers/
+      blacklist: this.target.disabledTransforms([
+        'es6.modules',
+        'validation.react',
+        'validation.undeclaredVariableCheck',
+        'utility.inlineEnvironmentVariables', // we do this ourselves
+        'reactCompat',
+        'strict', // just puts `"use strict"` in every source
+        'jscript',
       ]),
+
+      optional: this.target.transforms([
+        //'jo.modules',  // must be first
+        'runtime',
+        'es6.spec.blockScoping',
+        'es6.spec.symbols',
+        'es6.spec.templateLiterals',
+        'react',
+        'flow',
+      ]).concat([
+        //'jo.classes',
+        //'jo.fileLocalVars', // must be last
+      ]),
+
+      plugins: [
+        { transformer: plugins.Modules, position: 'before' },
+      ],
+
+      // resolveModuleSource: (source, filename) => {
+      //   // gets ref e.g. "foo" from `import "foo"`. The valuer returned is used in-place
+      //   // of "foo".
+      //   console.log('TRACE resolveModuleSource', source, filename);
+      //   return source;
+      // },
     };
 
+    // Make sure there are no "optional" transformers which are blacklisted
+    babelOptions.optional = babelOptions.optional.filter(transformerID =>
+      babelOptions.blacklist.indexOf(transformerID) === -1 )
+
+    var ctx = new CompileContext(this.pkg, srcfile, this.target, this.log);
+    babelOptions._joctx = ctx;
+
+    // Transform
+    console.log('babel options', repr(babelOptions));
+    var res = babel.transform(code, babelOptions);
+    console.log('babel.transform:', res.code);
+    res.imports = ctx.imports;
+    return res;
+  }
+
+  oldParseFile(srcfile, code, inSourceMap) {
+    var babelOptions = {};
     var T = babel.types;
-    var bfile = new BabelFile(bopts);
+    var BabelFile = function() { console.warn('TODO BabelFile'); };
+    var bfile = new BabelFile(babelOptions);
 
     // sort transformers.
     //   Note: yeah, this is messed up. Internally Babel relies on object-literal key order
@@ -559,7 +611,6 @@ class PkgCompiler {
 
     var res = bfile.parse(code);
     res.imports = bfile.joImports;
-    // console.log('babel.transform:', res.code)
     // console.log('bfile.joImports:', bfile.joImports)
 
     return /*ParseResult*/res;

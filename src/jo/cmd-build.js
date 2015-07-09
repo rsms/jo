@@ -56,7 +56,7 @@ main: async function(opts, args, usage, cb) {
     WorkDir.enableRemoveAtExit();
   }
 
-  var pkgs = []
+  var pkgs = [];
 
   if (args.length === 0) {
     // The current working directory is assumed to be a package

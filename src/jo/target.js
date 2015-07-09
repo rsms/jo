@@ -14,31 +14,6 @@ var Targets = {};
 //   map:SourceMap
 // }
 
-function _$record(name, prototype) {
-  var toString = function(){
-    return "<record "+this.__name+" "+JSON.stringify(this)+">";
-  };
-  Object.defineProperties(prototype, {
-    __name: {value:name},
-    toString: {value:toString},
-  });
-  Object.freeze(prototype);
-  var record = function(properties) {
-    var k, v, props = {};
-    for (k in properties) {
-      v = props[k];
-      if (v !== undefined) {
-        props[k] = {value:v, enumerable:true, configurable:true};
-      } else if (!(k in prototype)) {
-        throw new Error('unexpected property '+JSON.stringify(k)+' assigned to record '+name);
-      }
-    }
-    return Object.create(prototype, props);
-  };
-  record.default = prototype;
-  return record;
-}
-
 // record TargetOptions {
 //   logger:Logger
 //   output:string = null
@@ -235,9 +210,12 @@ class Target {
     // Transforms based on "debug" or "release" build settings:
     if (this.mode === TARGET_MODE_RELEASE) {
       transforms = transforms.concat([
-        'utility.removeDebugger',      // `debugger` -> ``
-        //Note: 'utility.inlineExpressions' is causes regex to disappear (babel 4.7.16)
-        'utility.deadCodeElimination', // `if (0) { foo(); } else { bar(); }` -> `bar();`
+        'minification.deadCodeElimination',
+        // 'minification.constantFolding',
+        // 'minification.memberExpressionLiterals',
+        // 'minification.propertyLiterals',
+        // 'minification.removeConsole',
+        'minification.removeDebugger',
       ]);
     } //else { // dev
       // TODO: sometime in the future, allow an "analyze" option, enabling things like TDZ and

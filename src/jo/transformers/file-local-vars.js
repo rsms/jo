@@ -1,5 +1,5 @@
 import {SrcLocation, SrcError} from '../util'
-import {types as t} from 'npmjs.com/babel'
+import {types as t} from 'npmjs.com/babel-core'
 
 
 function ReferenceError(file, node, message, related) {

@@ -13,21 +13,23 @@ class Logger {
     var So = this.style = TermStyle.stdout
     var Se = this.errstyle = TermStyle.stderr
     var werr = function(style, args) {
-      process.stderr.write(style.open);
-      console.error.apply(console, args);
-      process.stderr.write(style.close);
+      process.stderr.write(style.open + 'E ')
+      console.error.apply(console, args)
+      process.stderr.write(style.close)
     }
     if (level >= Logger.DEBUG) {
-      this.debug = (...args) => { console.log.apply(console, args); }
+      let prefix = So.boldMagenta('D');
+      this.debug = (...args) => { console.log.apply(console, [prefix].concat(args)); }
     }
     if (level >= Logger.INFO) {
       this.info = (...args) => { console.log.apply(console, args); }
     }
     if (level >= Logger.WARN) {
-      this.warn = (...args) => { console.log.apply(console, args); }
+      let prefix = So.boldYellow('W');
+      this.warn = (...args) => { console.log.apply(console, [prefix].concat(args)); }
     }
     if (level >= Logger.ERROR) {
-      this.error = (...args) => { werr(So.boldRed, args); }
+      this.error = (...args) => { werr(Se.boldRed, args); }
     }
     this.verbosityMap = {
       [this.DEBUG]: this.debug.bind(this),
