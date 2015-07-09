@@ -1,6 +1,6 @@
 {
   "name": "jo",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "Go-style JavaScript ES6 package compiler",
   "keywords": ["es6", "go", "compiler", "babel"],
   "license": {"type":"MIT","url":"https://github.com/rsms/jo/#mit-license"},
@@ -17,6 +17,7 @@
     "source-map": "^0.4.2",
     "source-map-support": "^0.3.2"
   },
-  "bin": {"jo": "./bin/jo"},
-  "files": [ "./bin/jo", "./pkg/nodejs.release", "./pkg/npm/npmjs.com", "./src" ]
+  "bin": {"jo": "bin/jo"},
+  "main": "pkg/nodejs.release/jo/index.js",
+  "files": [ "bin/jo", "pkg/nodejs.release", "pkg/npm/npmjs.com", "src" ]
 }
