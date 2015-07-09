@@ -1,5 +1,6 @@
 import sourceMap from 'npmjs.com/source-map'
 import path from 'path'
+import {ok as assert} from 'assert'
 
 class CodeBuffer {
   constructor(sourceDir:string, target:Target) {
@@ -234,9 +235,11 @@ class CodeBuffer {
       let idname = spec.name._origName || spec.name.name;
       if (impExprCode.substr(0,5) === '__$i(') {
         impExprCode = '__$iw(' + impExprCode.substr(5);
-      } else {
-        // assert(impExprCode.substr(0,6) === '__$im(')
+      } else if (impExprCode.substr(0,6) === '__$im(') {
         impExprCode = '__$imw(' + impExprCode.substr(6);
+      } else {
+        // wrap in `iw`
+        impExprCode = '__$iw(' + impExprCode + ')';
       }
       this.addLine(
         this.lineStart + spec.name.name + ' = ' + impExprCode + close,
