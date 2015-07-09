@@ -1,4 +1,4 @@
-//#jopkg{"files":["build.js","cmd-build.js","cmd-env.js","cmd-remotectrl.js","codebuf.js","compile.js","env.js","jo.js","logger.js","module.js","pkg.js","preprocessor.js","srcfile.js","target.js","target_browser.js","target_nodejs.js","tokenizer.js","toposort.js","workdir.js","writecode.js"],"imports":["asyncfs","path","os","./util","npmjs.com/source-map","npmjs.com/babel","npmjs.com/babel/lib/babel/transformation/file","npmjs.com/babel/lib/babel/transformation/transformer","npmjs.com/babel/lib/babel/generation","./transformers","./remotectrl"],"exports":["BuildCtx","BuildCmd","EnvCmd","RemoteControlCmd","CodeBuffer","ExportError","ReferenceError","CyclicReferenceError","PkgCompiler","Env","Mainv","Commands","Logger","Module","PrecompiledModule","Pkg","BuiltInPkg","NPMPkg","TokenEditor","Preprocessor","SrcFile","TARGET_BROWSER","TARGET_BROWSER_WEBKIT","TARGET_NODEJS","TARGET_MODE_DEV","TARGET_MODE_RELEASE","Targets","TargetOptions","GLOBAL_STD","GLOBAL_DEPRECATED","GLOBAL_UNSAFE","GLOBAL_EXPERIMENTAL","Target","BrowserTarget","NodeJSTarget","Tokenizer","WorkDir"],"babel-runtime":["helpers/async-to-generator","core-js","helpers/class-call-check","helpers/create-class","helpers/inherits","helpers/get","helpers/sliced-to-array","helpers/define-property"],"version":"ibvq2pme"}
+//#jopkg{"files":["build.js","cmd-build.js","cmd-env.js","cmd-remotectrl.js","codebuf.js","compile.js","env.js","jo.js","logger.js","module.js","pkg.js","preprocessor.js","srcfile.js","target.js","target_browser.js","target_nodejs.js","tokenizer.js","toposort.js","workdir.js","writecode.js"],"imports":["asyncfs","path","os","./util","npmjs.com/source-map","npmjs.com/babel","npmjs.com/babel/lib/babel/transformation/file","npmjs.com/babel/lib/babel/transformation/transformer","npmjs.com/babel/lib/babel/generation","./transformers","./remotectrl"],"exports":["BuildCtx","BuildCmd","EnvCmd","RemoteControlCmd","CodeBuffer","ExportError","ReferenceError","CyclicReferenceError","PkgCompiler","Env","Mainv","Commands","Logger","Module","PrecompiledModule","Pkg","BuiltInPkg","NPMPkg","TokenEditor","Preprocessor","SrcFile","TARGET_BROWSER","TARGET_BROWSER_WEBKIT","TARGET_NODEJS","TARGET_MODE_DEV","TARGET_MODE_RELEASE","Targets","TargetOptions","GLOBAL_STD","GLOBAL_DEPRECATED","GLOBAL_UNSAFE","GLOBAL_EXPERIMENTAL","Target","BrowserTarget","NodeJSTarget","Tokenizer","WorkDir"],"babel-runtime":["helpers/async-to-generator","core-js","helpers/class-call-check","helpers/create-class","helpers/inherits","helpers/get","helpers/sliced-to-array","helpers/define-property"],"version":"ibvs6j3l"}
 var _asyncToGenerator = __$irt("babel-runtime/helpers/async-to-generator")
   , _core = __$irt("babel-runtime/core-js")
   , _classCallCheck = __$irt("babel-runtime/helpers/class-call-check")
@@ -823,7 +823,15 @@ var NodeJSTarget = (function (_Target) {
 
         var rootInit = this.genJOROOTInitCode(pkg);
 
-        var codeVars = ("\nvar __$r=function(){__$r=" + rootInit + ";}\n,__$lrt=function(ref){\n  if(typeof __$r!==\"string\"){__$r();}\n  return require(__$r+\"/node_modules/\"+ref);\n}\n,__$i=global.__$i=function(m){return m && m.__esModule ? (m[\"default\"] || m) : m; }\n,__$iw=global.__$iw=function(m){return m && m.__esModule ? m : {\"default\":m}; }\n    ").trim() + "\n";
+        var rtPathCode = undefined;
+        if (pkg.ref === "jo/jo" && this.isDevMode) {
+          var selfJOROOT = _target_nodejs_js$path.resolve(__dirname, "..", "..", "..");
+          rtPathCode = "\"" + selfJOROOT.replace(/"/g, "\\\"") + "/node_modules/\"+ref";
+        } else {
+          rtPathCode = "__$r+\"/node_modules/\"+ref";
+        }
+
+        var codeVars = ("\nvar __$r=function(){__$r=" + rootInit + ";}\n,__$lrt=function(ref){\n  if(typeof __$r!==\"string\"){__$r();}\n  return require(" + rtPathCode + ");\n}\n,__$i=global.__$i=function(m){return m && m.__esModule ? (m[\"default\"] || m) : m; }\n,__$iw=global.__$iw=function(m){return m && m.__esModule ? m : {\"default\":m}; }\n    ").trim() + "\n";
 
         var codeRest = "\nglobal.__$irt=function(r){return __$i(__$lrt(r));};\n__$irt(\"source-map-support\").install();\n    ".trim() + "\n";
 
