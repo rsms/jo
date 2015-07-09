@@ -1,4 +1,4 @@
-//#jopkg{"files":["build.js","cmd-build.js","cmd-env.js","cmd-remotectrl.js","codebuf.js","compile.js","env.js","jo.js","logger.js","module.js","pkg.js","preprocessor.js","srcfile.js","target.js","target_browser.js","target_nodejs.js","tokenizer.js","toposort.js","workdir.js","writecode.js"],"imports":["asyncfs","path","os","./util","npmjs.com/source-map","npmjs.com/babel","npmjs.com/babel/lib/babel/transformation/file","npmjs.com/babel/lib/babel/transformation/transformer","npmjs.com/babel/lib/babel/generation","./transformers","./remotectrl"],"exports":["BuildCmd","BuildCtx","EnvCmd","RemoteControlCmd","CodeBuffer","ExportError","ReferenceError","CyclicReferenceError","PkgCompiler","Env","Mainv","Commands","Logger","Module","PrecompiledModule","Pkg","BuiltInPkg","NPMPkg","TokenEditor","Preprocessor","SrcFile","TARGET_BROWSER","TARGET_BROWSER_WEBKIT","TARGET_NODEJS","TARGET_MODE_DEV","TARGET_MODE_RELEASE","Targets","TargetOptions","GLOBAL_STD","GLOBAL_DEPRECATED","GLOBAL_UNSAFE","GLOBAL_EXPERIMENTAL","Target","BrowserTarget","NodeJSTarget","Tokenizer","WorkDir"],"babel-runtime":["helpers/async-to-generator","core-js","helpers/class-call-check","helpers/create-class","helpers/inherits","helpers/get","helpers/sliced-to-array","helpers/define-property"],"version":"ibtld635"}
+//#jopkg{"files":["build.js","cmd-build.js","cmd-env.js","cmd-remotectrl.js","codebuf.js","compile.js","env.js","jo.js","logger.js","module.js","pkg.js","preprocessor.js","srcfile.js","target.js","target_browser.js","target_nodejs.js","tokenizer.js","toposort.js","workdir.js","writecode.js"],"imports":["asyncfs","path","os","./util","npmjs.com/source-map","npmjs.com/babel","npmjs.com/babel/lib/babel/transformation/file","npmjs.com/babel/lib/babel/transformation/transformer","npmjs.com/babel/lib/babel/generation","./transformers","./remotectrl"],"exports":["BuildCtx","BuildCmd","EnvCmd","RemoteControlCmd","CodeBuffer","ExportError","ReferenceError","CyclicReferenceError","PkgCompiler","Env","Mainv","Commands","Logger","Module","PrecompiledModule","Pkg","BuiltInPkg","NPMPkg","TokenEditor","Preprocessor","SrcFile","TARGET_BROWSER","TARGET_BROWSER_WEBKIT","TARGET_NODEJS","TARGET_MODE_DEV","TARGET_MODE_RELEASE","Targets","TargetOptions","GLOBAL_STD","GLOBAL_DEPRECATED","GLOBAL_UNSAFE","GLOBAL_EXPERIMENTAL","Target","BrowserTarget","NodeJSTarget","Tokenizer","WorkDir"],"babel-runtime":["helpers/async-to-generator","core-js","helpers/class-call-check","helpers/create-class","helpers/inherits","helpers/get","helpers/sliced-to-array","helpers/define-property"],"version":"ibvq2pme"}
 var _asyncToGenerator = __$irt("babel-runtime/helpers/async-to-generator")
   , _core = __$irt("babel-runtime/core-js")
   , _classCallCheck = __$irt("babel-runtime/helpers/class-call-check")
@@ -796,12 +796,15 @@ var NodeJSTarget = (function (_Target) {
       value: function genJOROOTInitCode(pkg) {
         var bakedJOROOT = undefined;
         var dstDirAbs = _target_nodejs_js$path.dirname(_target_nodejs_js$path.resolve(this.programDstFile(pkg)));
+        var isSelfJOProgram = false;
         if (dstDirAbs.indexOf(Env.JOROOT) === 0) {
+          isSelfJOProgram = pkg.ref === "jo/jo";
           bakedJOROOT = "__dirname+" + JSON.stringify(_target_nodejs_js$path.relative(dstDirAbs, Env.JOROOT)).replace(/^"/, "\"/");
         } else {
           bakedJOROOT = JSON.stringify(Env.JOROOT);
         }
-        return "process.env.JOROOT||require(\"path\")." + (bakedJOROOT === "__dirname+\"/..\"" ? "dirname(__dirname)" : "resolve(" + bakedJOROOT + ")");
+        return ((isSelfJOProgram ? "" : "process.env.JOROOT||") + "require(\"path\")." + (bakedJOROOT === "__dirname+\"/..\"" ? "dirname(__dirname)" : "resolve(" + bakedJOROOT + ")")
+        );
       }
     },
     programBootCode: {
@@ -3888,8 +3891,8 @@ _target_nodejs_js$init();
 _target_browser_js$init();
 _cmd_build_js$init();
 _jo_js$init();
-exports.BuildCmd = BuildCmd;
 exports.BuildCtx = BuildCtx;
+exports.BuildCmd = BuildCmd;
 exports.EnvCmd = EnvCmd;
 exports.RemoteControlCmd = RemoteControlCmd;
 exports.CodeBuffer = CodeBuffer;
