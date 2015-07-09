@@ -1,4 +1,4 @@
-//#jopkg{"files":["jsidentifier.js","levenshtein.js","parseopt.js","repr.js","srcerror.js","srclocation.js","termstyle.js","unique.js"],"imports":["util","path"],"exports":["RE","JSIdentifier","LevenshteinDistance","ParseOpt","repr","SrcError","SrcErrors","SrcLocation","Unique","SupportedTerms","TermStyle"],"babel-runtime":["core-js"],"version":"ibvq2pvi"}
+//#jopkg{"files":["jsidentifier.js","levenshtein.js","parseopt.js","repr.js","srcerror.js","srclocation.js","termstyle.js","unique.js"],"imports":["util","path"],"exports":["RE","JSIdentifier","LevenshteinDistance","ParseOpt","repr","SrcError","SrcErrors","SrcLocation","SupportedTerms","TermStyle","Unique"],"babel-runtime":["core-js"],"version":"ibvs6jdb"}
 var _core = __$irt("babel-runtime/core-js")
   , _repr_js$inspect = __$i(require("util")).inspect
   , _parseopt_js$path = __$i(require("path"));
@@ -582,7 +582,7 @@ exports.repr = repr;
 exports.SrcError = SrcError;
 exports.SrcErrors = SrcErrors;
 exports.SrcLocation = SrcLocation;
-exports.Unique = Unique;
 exports.SupportedTerms = SupportedTerms;
 exports.TermStyle = TermStyle;
+exports.Unique = Unique;
 //#sourceMappingURL=index.js.map

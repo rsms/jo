@@ -167,12 +167,26 @@ class NodeJSTarget extends Target {
     // JOROOT to bake into source
     let rootInit = this.genJOROOTInitCode(pkg);
 
+    // Runtime path code
+    let rtPathCode;
+    if (pkg.ref === 'jo/jo' && this.isDevMode) {
+      // For dev builds of jo itself, embed hard-coded path to node_modules
+      // based on where this version of jo was built.
+      // If we don't do this, then building jo from a different source tree
+      // than the calling jo program was built for causes a mismatch of
+      // generated code and runtime support.
+      let selfJOROOT = path.resolve(__dirname, '..', '..', '..');
+      rtPathCode = '"' + selfJOROOT.replace(/"/g, '\\"') + '/node_modules/"+ref';
+    } else {
+      rtPathCode = '__$r+"/node_modules/"+ref';
+    }
+
     // Code: variables
     let codeVars = `
 var __$r=function(){__$r=${rootInit};}
 ,__$lrt=function(ref){
   if(typeof __$r!=="string"){__$r();}
-  return require(__$r+"/node_modules/"+ref);
+  return require(${rtPathCode});
 }
 ,__$i=global.__$i=function(m){return m && m.__esModule ? (m["default"] || m) : m; }
 ,__$iw=global.__$iw=function(m){return m && m.__esModule ? m : {"default":m}; }

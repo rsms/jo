@@ -1,4 +1,4 @@
-//#jopkg{"files":["asyncfs.js"],"imports":["fs"],"exports":["default"],"babel-runtime":["core-js"],"version":"ibvq2pz8"}
+//#jopkg{"files":["asyncfs.js"],"imports":["fs"],"exports":["default"],"babel-runtime":["core-js"],"version":"ibvs6jhm"}
 var _core = __$irt("babel-runtime/core-js")
   , _asyncfs_js$fs = __$i(require("fs"));
 "use strict";
