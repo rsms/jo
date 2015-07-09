@@ -126,15 +126,29 @@ class NodeJSTarget extends Target {
   genJOROOTInitCode(pkg:Pkg) {
     let bakedJOROOT;
     let dstDirAbs = path.dirname(path.resolve(this.programDstFile(pkg)));
+    let isSelfJOProgram = false;
     if (dstDirAbs.indexOf(Env.JOROOT) === 0) {
+      isSelfJOProgram = pkg.ref === 'jo/jo';
       bakedJOROOT = '__dirname+' +
         JSON.stringify(path.relative(dstDirAbs, Env.JOROOT)).replace(/^"/, '"/');
     } else {
       bakedJOROOT = JSON.stringify(Env.JOROOT);
     }
-    return 'process.env.JOROOT||require("path").' +
-      (bakedJOROOT === '__dirname+"/.."' ? 'dirname(__dirname)' :
-                                           'resolve(' + bakedJOROOT + ')');
+    return (
+
+      // Note: When building ourselves (local "jo/jo") don't care about env.JOROOT.
+      // This allows one jo program to build another jo program, for instance:
+      //   JOROOT=/dev-jo /stable-jo/bin/jo build jo/jo
+      //   /dev-jo/bin/jo
+      // As dev-jo might contain pkgs which are incompatible with /stable-jo/bin/jo,
+      // we must ensure that stable-jo loads its packages from /stable-jo/pkg rather
+      // than JOROOT/pkg.
+      (isSelfJOProgram ? '' : 'process.env.JOROOT||') +
+
+      'require("path").' +
+        (bakedJOROOT === '__dirname+"/.."' ? 'dirname(__dirname)' :
+                                             'resolve(' + bakedJOROOT + ')')
+    );
   }
 
 
