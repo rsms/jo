@@ -1,6 +1,7 @@
 import sourceMap from 'npmjs.com/source-map'
 import path from 'path'
 import {ok as assert} from 'assert'
+import {repr, SrcLocation} from './util'
 
 class CodeBuffer {
   constructor(sourceDir:string, target:Target) {
@@ -20,7 +21,7 @@ class CodeBuffer {
   }
 
 
-  addLine(linechunk, srcfilename, srcloc) {
+  appendLine(linechunk, srcfilename, srcloc) {
     if (__DEV__) {
       if (linechunk.indexOf('\n') !== -1) {
         throw new Error('unexpected linebreak in linechunk');
@@ -39,7 +40,7 @@ class CodeBuffer {
   }
 
 
-  appendCode(code, srcloc, srcfilename) {
+  appendCode(code:string, srcloc:SrcLocation, srcfilename?:string) {
     var startLine = this.line;
     code = code.trim();
     var lines = code.split(/\r?\n/);
@@ -118,7 +119,7 @@ class CodeBuffer {
       // assert(imp.specifiers.length === 1)
       let spec = imp.specifiers[0];
       if (spec.id.name === 'default') {
-        this.addLine(
+        this.appendLine(
           this.lineStart + spec.name.name+' = __$irt(' + JSON.stringify(ref) + ')' +
           ((isLast && i === runtimeRefs.length-1) ? ';' : '')
         );
@@ -130,133 +131,176 @@ class CodeBuffer {
 
 
   addModuleImports(importRefs) {
+    // Returns an object describing the package refs and symbols used,
+    // e.g. code:
+    //   import {a, bob as b} from "foo"
+    //   import f from "foo"
+    //   import {c} from "bar"
+    // Returns:
+    //   {
+    //     "foo": {
+    //       nodes: [ Import, Import, Import ]
+    //       names: ["a", "bob", "default"]
+    //     },
+    //     "bar": {
+    //       nodes: [ Import ]
+    //       names: ["c"]
+    //     },
+    //   }
     var imports = {};
     var refs = Object.keys(importRefs);
+    var lastIndex = refs.length-1;
     refs.forEach((ref, index) => {
+      // console.log('addModuleImports ["'+ref+'"] =>', repr(importRefs[ref],2))
       imports[ref] = {
         nodes: importRefs[ref],
-        names: this.addModuleImport(ref, importRefs[ref], index, refs.length),
+        names: this._addModuleImport(ref, importRefs[ref], /*isLastImp=*/index === lastIndex),
       };
     });
     return imports;
   }
 
 
-  addModuleImport(ref, imps, index, count) {
-    var names = [];
-    var defaultIDName;
-    var isLastImp = index === count-1;
+  _addModuleImportBase(ref:string, imps:Import[], isLastImp:bool) {
+    var requireExpr = this.genRequireExpr(ref);
 
-    if (imps.length === 1) {
-      // Attempt optimization:
+    // Is there any default name used for the module?
+    for (let imp of imps) {
+      for (let spec of imp.specifiers) {
+        if (!spec.imported || spec.imported.name === 'default') {
+          // Some file imports the module as "default", so let's use that localized id
+          let isLast = (isLastImp && imps.length === 1 && imp.specifiers.length === 1);
+          let name = this.addImport(imp, requireExpr, spec, isLast);
+          return [spec.local.name, {imp:imp, spec:spec, name:name}]
+        }
+      }
+    }
+
+    // Nothing imports the module as "default". We use an anonymous ID.
+    var defaultIDName = this.anonIDName();
+    this.appendLine(
+      this.lineStart + defaultIDName+' = '+requireExpr,
+      // Map this line as being semantically generated from the first occurance of the
+      // module import:
+      imps[0].srcfile.name,
+      imps[0].source.loc
+    );
+    return [defaultIDName, null]
+  }
+
+
+  _addModuleImportRest(imps:Import[], defaultIDName:string, names:string[]/*MUTATES*/) {
+    // Find remaining imports and specs excluding any spec matching defaultIDName
+    imps.forEach(imp => {
+      imp.specifiers.forEach(spec => {
+        if (spec.local.name !== defaultIDName) {
+          names.push(this.addImport(imp, defaultIDName, spec, /*isLast=*/false));
+        }
+      })
+    })
+  }
+
+
+  _addLastModuleImportRest(imps:Import[], defaultIDName:string, names:string[]/*MUTATES*/) {
+    // Version of _addModuleImportRest for the sequentially-last ref imports, where we
+    // break up the imps loop into two with buffering in restImp so we can know when we
+    // generate the last import statement.
+
+    // Find remaining imports and specs excluding any spec matching defaultIDName
+    let restImp = []
+    imps.forEach(imp => {
+      let specs = [for (spec of imp.specifiers) if (spec.local.name !== defaultIDName) spec];
+      if (specs.length !== 0) {
+        restImp.push({imp:imp, specs:specs})
+      }
+    })
+
+    for (let i = 0; i !== restImp.length; i++) {
+      let {imp, specs} = restImp[i];
+      let isLast = i === restImp.length-1;
+      for (let i = 0, lastIndex = specs.length-1; i !== specs.length; i++) {
+        names.push(this.addImport(imp, defaultIDName, specs[i], isLast && i === lastIndex));
+      }
+    }
+  }
+
+
+  _addModuleImport(ref:string, imps:Import[], isLastImp:bool) {
+    // Returns a list of spec names as they are exported from the module, meaning
+    // that one of the names can be used verbatim against the imported modules' API
+    // to retrieve its value.
+    var names = [];
+
+    if (imps.length === 1 && imps[0].specifiers.length === 1) {
+      // Optimization:
+      //    var _file$foo = require("foo");
       //  Instead of:
       //    var _$0 = require("foo");
-      //    var x = _$0 ...
-      //  Do:
-      //    var _file$foo = require("foo");
-      if (imps[0].specifiers.length === 1) {
-        return [this.addImport(
-          imps[0],
-          this.genRequireExpr(ref),
-          imps[0].specifiers[0],
-          isLastImp
-        )];
-      }
+      //    var x = _$0;
+      return [
+        this.addImport(imps[0], this.genRequireExpr(ref), imps[0].specifiers[0], isLastImp)
+      ];
     }
 
-    let defaultImp = this._defaultNameForImports(imps);
-
+    // Add module base import e.g. `foo = require("foo")` which is then used for specific imports.
+    // If there's no default import of the module, e.g. only `import {x} from "foo"`, then an
+    // anonymous ID is returned (and defaultImp is null), and e.g. code like this is generate:
+    // `var _$$3 = require("foo")`.
+    var [defaultIDName, defaultImp] = this._addModuleImportBase(ref, imps, isLastImp);
     if (defaultImp) {
-      // Only one file imports the module as "default", so we avoid anonID
-      defaultIDName = defaultImp.spec.name.name;
-      names.push(this.addImport(
-        defaultImp.imp,
-        this.genRequireExpr(ref),
-        defaultImp.spec,
-        /*isLast=*/(isLastImp && imps.length === 1)
-      ));
-    } else {
-      // Nothing imports the module as "default". We use an anonymous ID.
-      defaultIDName = this.anonIDName();
-      this.addLine(
-        this.lineStart + defaultIDName+' = '+this.genRequireExpr(ref),
-        imps[0].srcfile.name,
-        imps[0].source.loc
-      );
+      names.push(defaultImp.name);
     }
+    //console.log('defaultImp (ref="'+ref+'"):', defaultImp)
 
-    var specs, remainingImps = [for(imp of imps)
-      if ((specs = [for (s of imp.specifiers) if (s.name.name !== defaultIDName) s]).length)
-        {imp:imp, specs:specs}];
-
-    for (let i = 0; i !== remainingImps.length; i++) {
-      let {imp, specs} = remainingImps[i];
-      let isLast = isLastImp && i === remainingImps.length-1;
-      for (let i = 0, lastIndex = specs.length-1; i !== specs.length; i++) {
-        let spec = specs[i];
-        names.push(this.addImport(
-          imp,
-          defaultIDName,
-          spec,
-          isLast && i === lastIndex
-        ));
-      }
+    if (isLastImp) {
+      this._addLastModuleImportRest(imps, defaultIDName, names)
+    } else {
+      this._addModuleImportRest(imps, defaultIDName, names)
     }
 
     return names;
   }
 
 
-  _defaultNameForImports(imps) {
-    // Is there any default name used for the module?
-    for (let imp of imps) {
-      for (let spec of imp.specifiers) {
-        if (spec.default) {
-          return {imp:imp, spec:spec};
-        }
-      }
-    }
-  }
-
-
-  addImport(imp, impExprCode, spec, isLast:bool) {
+  addImport(imp, moduleCode, spec, isLast:bool) {
+    // Returns spec's name in the imported module's API.
+    // E.g.
+    //    import {x as y} from "foo"
+    //           ~~~~~~~~
+    // Returns "x" (NOT "y" or "_filename$y")
     var close = isLast ? ';' : '';
-    if (spec.default) {
-      this.addLine(
-        this.lineStart + spec.name.name+' = '+impExprCode + close,
-        imp.srcfile.name,
-        imp.loc
-      )
-      return 'default';
+      // ^ TODO FIXME a cleaner and spearated way to do this
+    var srcline;
+    var specName = spec.imported ? spec.imported.name : 'default';
+
+    if (specName === 'default') {
+      // E.g. `import foo from "foo"`
+      // E.g. `import "foo"`
+      if (!spec.local) {
+        console.log('!spec.local for spec', repr(spec,1))
+      }
+      srcline = this.lineStart + spec.local.name + ' = ' + moduleCode + close;
 
     } else if (spec.type === 'ImportBatchSpecifier') {
-      // import * as x from 'y'
-      //        ^
-      let idname = spec.name._origName || spec.name.name;
-      if (impExprCode.substr(0,5) === '__$i(') {
-        impExprCode = '__$iw(' + impExprCode.substr(5);
-      } else if (impExprCode.substr(0,6) === '__$im(') {
-        impExprCode = '__$imw(' + impExprCode.substr(6);
+      // E.g. `import * as foo from "foo"`
+      if (moduleCode.substr(0,5) === '__$i(') {
+        moduleCode = '__$iw(' + moduleCode.substr(5);
+      } else if (moduleCode.substr(0,6) === '__$im(') {
+        moduleCode = '__$imw(' + moduleCode.substr(6);
       } else {
         // wrap in `iw`
-        impExprCode = '__$iw(' + impExprCode + ')';
+        moduleCode = '__$iw(' + moduleCode + ')';
       }
-      this.addLine(
-        this.lineStart + spec.name.name + ' = ' + impExprCode + close,
-        imp.srcfile.name,
-        imp.loc
-      )
-      return idname;
+      srcline = this.lineStart + spec.local.name + ' = ' + moduleCode + close;
 
     } else {
-      let idname = spec.id._origName || spec.id.name;
-      this.addLine(
-        this.lineStart + spec.name.name+' = '+impExprCode+'.'+idname + close,
-        imp.srcfile.name,
-        imp.loc
-      )
-      return idname;
+      // E.g. `import {x} from "foo"`
+      // E.g. `import {x as y} from "foo"`
+      srcline = this.lineStart + spec.local.name+' = '+moduleCode+'.'+spec.imported.name + close;
     }
+
+    this.appendLine(srcline, imp.srcfile.name, imp.loc);
+    return specName;
   }
 
 
@@ -268,6 +312,46 @@ class CodeBuffer {
       return '__$i(require('+JSON.stringify(ref)+'))'
     } else {
       return '__$im(require,'+JSON.stringify(ref)+')'
+    }
+  }
+
+
+  appendExport(exp:Export, codegen:Function) {
+    let srcloc = SrcLocation(exp.node, exp.file);
+
+    if (exp.name === 'default') {
+      this.appendLine('exports.__esModule=true;', null, srcloc);
+    }
+
+    if (exp.node.type === 'Identifier') {
+      // simple path: avoid codegen
+      if (exp.name === 'default') {
+        this.appendLine('exports["default"]='+exp.node.name+';', null, srcloc);
+      } else {
+        this.appendLine('exports.'+exp.name+'='+exp.node.name+';', null, srcloc);
+      }
+    } else {
+      // value is complex, so we need to codegen from AST
+      let propExpr;
+      if (exp.name === 'default') {
+        propExpr = t.literal(exp.name); // ["default"]
+      } else {
+        propExpr = t.identifier(exp.name); // prop
+      }
+      // codegen
+      let code = codegen(
+        t.program([
+          t.expressionStatement(
+            t.assignmentExpression(
+              '=',
+              t.memberExpression(t.identifier("exports"), propExpr, true),
+              exp.node
+            )
+          )
+        ])
+      );
+      console.log('codegen =>', code);
+      this.appendCode(code, srcloc);
     }
   }
 

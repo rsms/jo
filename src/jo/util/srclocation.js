@@ -1,60 +1,49 @@
 // var style = require('./termstyle');
-/*
-interface SrcCodeData {
-  substring(start:int, end:int):string
+
+type SrcLocation = {
+  filename:string;
+  code:string;
+  range:int[]; // start, end
+  startLine:int;
+  startColumn:int;
+  endLine:int;
+  endColumn:int;
+};
+
+
+function SrcLocation(node:ASTNode, file?:SrcFile) {
+  let filename = file ? (file.pkg ? file.pkg.id+'/'+file.name
+                                  : file.relpath)
+                      : null;
+  return Object.create(SrcLocation.prototype, {
+    filename:    {value: filename, enumerable:true},
+    code:        {value: file ? file.code : null, enumerable:true},
+    range:       {value: (node && Array.isArray(node.range)) ? node.range : [0,0], enumerable:true},
+    startLine:   {value: (node && node.loc) ? node.loc.start.line : undefined, enumerable:true},
+    startColumn: {value: (node && node.loc) ? node.loc.start.column : undefined, enumerable:true},
+    endLine:     {value: (node && node.loc) ? node.loc.end.line : undefined, enumerable:true},
+    endColumn:   {value: (node && node.loc) ? node.loc.end.column : undefined, enumerable:true},
+  });
 }
 
-interface SrcLocation {
-  filename:string
-  code:SrcCodeData
-  range:int[]  // start, end
-  startLine:int
-  startColumn:int
-  endLine:int
-  endColumn:int
-}*/
-
-// SrcLocation(node:ASTNode, file?:SrcFile):SrcLocation
-// SrcLocation(props:{
-//   filename?:string,
-//   code?:SrcCodeData,
-//   range?:int[],
-//   startLine?:int,
-//   startColumn?:int,
-//   endLine?:int,
-//   endColumn?:int
-// }):SrcLocation
-function SrcLocation(props) {
-  if (arguments.length === 2) {
-    let node = arguments[0], file = arguments[1];
-    let filename = null;
-    if (file) {
-      if (file.pkg) {
-        filename = file.pkg.id+'/'+file.name;
-      } else {
-        filename = file.relpath;
-      }
-    }
-    return Object.create(SrcLocation.prototype, {
-      filename:    {value: filename, enumerable:true},
-      code:        {value: file ? file.code : null, enumerable:true},
-      range:       {value: node && Array.isArray(node.range) ? node.range : [0,0], enumerable:true},
-      startLine:   {value: node && node.loc ? node.loc.start.line : undefined, enumerable:true},
-      startColumn: {value: node && node.loc ? node.loc.start.column : undefined, enumerable:true},
-      endLine:     {value: node && node.loc ? node.loc.end.line : undefined, enumerable:true},
-      endColumn:   {value: node && node.loc ? node.loc.end.column : undefined, enumerable:true},
-    });
-  } else {
-    return Object.create(SrcLocation.prototype, {
-      filename:    {value: props.filename, enumerable:true},
-      code:        {value: props.code, enumerable:true},
-      range:       {value: Array.isArray(props.range) ? props.range : [0,0], enumerable:true},
-      startLine:   {value: props.startLine, enumerable:true},
-      startColumn: {value: props.startColumn, enumerable:true},
-      endLine:     {value: props.endLine, enumerable:true},
-      endColumn:   {value: props.endColumn, enumerable:true},
-    });
-  }
+function SrcLocationWithProps({
+  filename, //:string,
+  code, //:SrcCodeData,
+  range, //:int[],
+  startLine, //:int,
+  startColumn, //:int,
+  endLine, //:int,
+  endColumn, //:int
+}) {
+  return Object.create(SrcLocation.prototype, {
+    filename:    {value: filename, enumerable:true},
+    code:        {value: code, enumerable:true},
+    range:       {value: range || [0,0], enumerable:true},
+    startLine:   {value: startLine, enumerable:true},
+    startColumn: {value: startColumn, enumerable:true},
+    endLine:     {value: endLine, enumerable:true},
+    endColumn:   {value: endColumn, enumerable:true},
+  });
 }
 
 

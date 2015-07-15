@@ -9,7 +9,7 @@ var Env = Object.create(null, {
   JOPATH: {
     enumerable: true,
     get:( ) => _JOPATH || (_JOPATH = process.env.JOPATH ? Env.parse(process.env.JOPATH) : []),
-    set:(v) => { _JOPATH = v; process.env.JOPATH = Env.format(v); _paths = null; _paths = null },
+    set:(v) => { _JOPATH = v; process.env.JOPATH = Env.format(v); _paths = null; },
   },
 
   JOROOT: {

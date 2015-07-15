@@ -1,4 +1,4 @@
-var util = require('util');
+import 'util'
 
 function SrcError(name, srcloc, message, suggestion, related) {
   if (!(this instanceof SrcError)) {
@@ -19,6 +19,9 @@ function SrcError(name, srcloc, message, suggestion, related) {
   // this.column        = node.loc.start.column;
 }
 
+// SrcError.prototype = new Error;
+util.inherits(SrcError, Error);
+
 
 function SrcErrors(errors) {
   return Object.create(SrcErrors.prototype, {
@@ -27,8 +30,48 @@ function SrcErrors(errors) {
 }
 
 
-// SrcError.prototype = new Error;
-util.inherits(SrcError, Error);
+function RefError(file, node, message, related) {
+  return SrcError('RefError', SrcLocation(node, file), message, null, related);
+}
+
+function ImportError(file, node, message, fixSuggestion, related) {
+  return SrcError('ImportError', SrcLocation(node, file), message, fixSuggestion, related);
+}
+
+function ExportError(file, node, message, fixSuggestion, related) {
+  return SrcError('ExportError', SrcLocation(node, file), message, fixSuggestion, related);
+}
+
+function CyclicRefError(pkg, name, fileA, fileB, deps, onlyClasses:bool) {
+  let errs = [
+    { message: `"${name}" defined here`,
+      srcloc:  SrcLocation(fileB.definedIDs[name].identifier, fileB) }, // HERE
+    { message: `"${name}" referenced here`,
+      srcloc:  SrcLocation(fileA.unresolvedIDs[name].node, fileA) }
+  ];
+  deps.forEach(dep => {
+    //if (!onlyClasses || dep.binding.path.type === 'ClassExpression') {
+    errs = errs.concat([
+      { message: `"${dep.name}" defined here`,
+        srcloc:  SrcLocation(dep.binding.identifier, fileA) },
+      { message: `"${dep.name}" referenced here`,
+        srcloc:  SrcLocation(dep.refNode, fileB) },
+    ]);
+    //}
+  });
+  return RefError(
+    null,
+    null,
+    `cyclic dependency between source files "${fileA.name}" and "${fileB.name}"`+
+    ` in package "${pkg.id}"`,
+    errs
+  );
+}
+
+function styleCodeQuotes(s) {
+  var S = TermStyle.stderr;
+  return S.enabled ? s.replace(/`([^`]*)`/g, (_, m) => S.cyan(m) ) : s;
+}
 
 
 SrcError.canFormat = function(err) {
@@ -39,13 +82,13 @@ SrcError.canFormat = function(err) {
 
 
 SrcError.formatSource = function(srcloc, message, errname, caretColor, linesB, linesA, indent) {
-  var S = TermStyle.stdout;
+  var S = TermStyle.stderr;
   if (!indent) indent = '';
   var msg = indent;
   if (srcloc && srcloc.filename) {
     msg += srcloc.formatFilename(caretColor) + ' '
   }
-  msg += S.bold(message);
+  msg += S.bold(styleCodeQuotes(message));
   if (errname) {
     msg += ' ' + S.grey('('+errname+')');
   }
@@ -57,7 +100,7 @@ SrcError.formatSource = function(srcloc, message, errname, caretColor, linesB, l
 
 
 function srclocForError(err) {
-  return err.srcloc || SrcLocation({
+  return err.srcloc || SrcLocationWithProps({
     filename:    (err.file ? err.file.name : err.filename),
     code:        (err.file ? err.file.code : err.sourceCode),
     range:       [err.index, err.index],
@@ -69,14 +112,10 @@ function srclocForError(err) {
 }
 
 
-function styleCodeQuotes(s) {
-  var S = TermStyle.stdout;
-  return S.enabled ? S.bold(s.replace(/`([^`]*)`/g, (_, m) => S.cyan(m) ))
-                   : s;
-}
-
 function formatSuggestion(suggestion:string, indent:string) {
-  return indent + styleCodeQuotes(suggestion.replace(/\n/mg, indent)) + '\n';
+  return indent +
+         TermStyle.stderr.bold(styleCodeQuotes(suggestion.replace(/\n/mg, indent))) +
+         '\n';
 }
 
 

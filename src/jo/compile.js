@@ -14,6 +14,9 @@ import {
   JSIdentifier,
   SrcError,
   SrcErrors,
+  RefError,
+  ExportError,
+  CyclicRefError,
   SrcLocation,
   repr,
   Unique,
@@ -29,41 +32,7 @@ import {
 // babel.transform.transformers['jo.fileLocalVars'] =
 //   new Transformer('jo.fileLocalVars', FileLocalVarsTransformer);
 
-function ExportError(file, node, message, fixSuggestion, related) {
-  return SrcError('ExportError', SrcLocation(node, file), message, fixSuggestion, related);
-}
 
-function ReferenceError(file, node, message, related) {
-  return SrcError('ReferenceError', SrcLocation(node, file), message, null, related);
-}
-
-function CyclicReferenceError(pkg, name, fileA, fileB, deps, onlyClasses:bool) {
-  let errs = [
-    { message: `"${name}" defined here`,
-      srcloc:  SrcLocation(fileB.definedIDs[name].node, fileB) },
-    { message: `"${name}" referenced here`,
-      srcloc:  SrcLocation(fileA.unresolvedIDs[name].node, fileA) }
-  ];
-  deps.forEach(dep => {
-    if (!onlyClasses || dep.defNode.type === 'ClassExpression') {
-      errs.push({
-        message: `"${dep.name}" defined here`,
-        srcloc:  SrcLocation(dep.defNode, fileA)
-      });
-      errs.push({
-        message: `"${dep.name}" referenced here`,
-        srcloc:  SrcLocation(dep.refNode, fileB)
-      });
-    }
-  });
-  return ReferenceError(
-    null,
-    null,
-    `cyclic dependency between source files "${fileA.name}" and "${fileB.name}"`+
-    ` in package "${pkg.id}"`,
-    errs
-  );
-}
 
 
 // interface SrcFile {
@@ -138,8 +107,8 @@ class PkgCompiler {
     // load code and ast for each source file of the package
     await this.parseFiles(srcfiles)
 
-    // Resolve inter-file dependencies (e.g. fileC -> fileA -> fileB)
-    this.resolveInterFileDeps(srcfiles)
+    // Resolve cross-file dependencies (e.g. fileC -> fileA -> fileB)
+    this.resolveCrossFileDeps(srcfiles)
 
     // Sort srcfiles by symbol dependency
     srcfiles = this.sortFiles(srcfiles);
@@ -169,13 +138,7 @@ class PkgCompiler {
   }
 
 
-  // (srcfiles:SrcFile[], codebuf:CodeBuffer)
-  genHeader(srcfiles, codebuf) {
-    //  E.g.
-    //    var _$0 = require('pkg1'), _$1 = require('pkg2');
-    //    var file1$a = _$0, file1$b = _$0.B;
-    //    var file2$c = _$1.c;
-
+  groupedImports(srcfiles:SrcFile[]) { //:[runtimeImps:{ref=Imp},importRefs:{ref=Imp[]}]
     // Contains a mapping from runtime helper ref => last import
     var runtimeImps = {};
 
@@ -201,54 +164,53 @@ class PkgCompiler {
       }
     }
 
+    return [runtimeImps, importRefs]
+  }
 
+
+  genPkgInfo(runtimeImps, importRefs) {
     // Gen pkginfo header
     var runtimeRefPrefixLen = 'babel-runtime/'.length;
-    var pkginfo = {
-      files:   this.pkg.files,
-      imports: Object.keys(importRefs),
-      exports: Object.keys(this.pkg.exports),
-      'babel-runtime': Object.keys(runtimeImps).map(ref => {
-        return ref.substr(runtimeRefPrefixLen);
-      }),
-      version: Date.now().toString(36),
+    var runtimeRefs = Object.keys(runtimeImps).map(ref => ref.substr(runtimeRefPrefixLen) );
+    return {
+      files:     this.pkg.files,
+      imports:   Object.keys(importRefs),
+      importsrt: runtimeRefs,
+      exports:   Object.keys(this.pkg.exports),
+      implv:     Date.now().toString(36), // FIXME: code content hash?
+      apiv:      Date.now().toString(36), // FIXME: API hash?
+      main:      this.pkg.hasMainFunc,
     };
-    if (this.pkg.hasMainFunc) {
-      pkginfo.main = true;
-    }
-    this.pkg.pkgInfo = pkginfo;
+  }
 
 
-    // Add any target header
+  genHeader(srcfiles:SrcFile[], codebuf:CodeBuffer) {
+    //  E.g.
+    //    var _$0 = require('pkg1'), _$1 = require('pkg2');
+    //    var file1$a = _$0, file1$b = _$0.B;
+    //    var file2$c = _$1.c;
+
+    // Unique and separate runtime and import refs
+    var [runtimeImps, importRefs] = this.groupedImports(srcfiles)
+
+    // Generate pkginfo
+    this.pkg.pkgInfo = this.genPkgInfo(runtimeImps, importRefs);
+
+    // Allow target to add any code to the header at this point
     if (this.target.pkgModuleHeader) {
       let targetHeaderCode = this.target.pkgModuleHeader(this.pkg, this.depLevel);
       if (targetHeaderCode) {
         targetHeaderCode.trim().split(/\r?\n/g).forEach(line => {
-          codebuf.addLine(line);
+          codebuf.appendLine(line);
         });
       }
     }
 
-    // Add pkginfo
-    codebuf.addLine('//#jopkg'+JSON.stringify(pkginfo));
+    // Add pkginfo line
+    codebuf.appendLine('//#jopkg'+JSON.stringify(this.pkg.pkgInfo));
 
     // Add imports
     if (Object.keys(runtimeImps).length !== 0 || Object.keys(importRefs).length !== 0) {
-
-      // // Add interop require
-      // codebuf.addLine(
-      //   'var _$import = function(m) {'+
-      //     'return m && m.__esModule ? m["default"] || m : m;'+
-      //   '}'
-      // );
-
-      // // TODO: Only add this if needed ("import * as x from 'y'")
-      // codebuf.addLine(
-      //   ', _$importWC = function(m) {'+
-      //     'return m && m.__esModule ? m : {"default":m};'+
-      //   '}'
-      // );
-
       // Add runtime helpers
       codebuf.addRuntimeImports(runtimeImps, Object.keys(importRefs).length===0);
 
@@ -263,7 +225,7 @@ class PkgCompiler {
     // Add calls to any init() functions
     for (let srcfile of srcfiles) {
       if (srcfile.initFuncName) {
-        codebuf.addLine(srcfile.initFuncName + '();');
+        codebuf.appendLine(srcfile.initFuncName + '();');
       }
     }
 
@@ -275,95 +237,29 @@ class PkgCompiler {
       let s = this.target.pkgModuleFooter(this.pkg, this.depLevel);
       if (s) {
         s.trim().split(/\r?\n/g).forEach(line => {
-          codebuf.addLine(line);
+          codebuf.appendLine(line);
         });
       }
     }
 
     // Source map directive (must be last)
     if (this.module.file) {
-      codebuf.addLine('//#sourceMappingURL='+path.basename(this.module.file)+'.map');
+      codebuf.appendLine('//#sourceMappingURL='+path.basename(this.module.file)+'.map');
     }
   }
 
 
-  // Returns { filename: [Export, ...], ...}
-  exportsGroupedByFile(srcfiles) {
-    var exports = {};
-    for (let name in this.pkg.exports) {
-      let exp = this.pkg.exports[name];
-      let expv = exports[exp.file.name];
-      if (!expv) {
-        exports[exp.file.name] = [exp];
-      } else {
-        expv.push(exp);
-      }
-    }
-    return exports;
+  genExports(srcfiles:SrcFile[], codebuf:CodeBuffer) {
+    // Exports for this package sorted by name so that generated code changes as little as possible
+    let codegen = this.codegen.bind(this);
+    Object.keys(this.pkg.exports).sort().forEach(name => {
+      codebuf.appendExport(this.pkg.exports[name], codegen)
+    })
   }
 
 
-  genExports(srcfiles, codebuf) {
-    var exportsByFile = this.exportsGroupedByFile(srcfiles);
-    var exportFilenames = Object.keys(exportsByFile);
-    if (exportFilenames.length === 0) {
-      // nothing exported
-      return;
-    }
-
-    // var lastFile = srcfiles[srcfiles.length-1];
-
-    var t = babel.types;
-
-    for (let filename in exportsByFile) {
-      let exports = exportsByFile[filename];
-      //let ast = { type: 'Program', body: [], comments: [], tokens: [] };
-      let srcfile = exports[0].file;
-
-      for (let exp of exports) {
-        let ast = { type: 'Program', body: [], comments: [], tokens: [] };
-        let memberExpr;
-
-        if (exp.name === 'default') {
-          // Generate `exports.__esModule = true`
-          // Note: intentionally no srcloc
-          codebuf.appendCode(
-            this.codegen(
-              t.expressionStatement(
-                t.assignmentExpression(
-                  '=',
-                  t.memberExpression(t.identifier("exports"), t.identifier("__esModule")),
-                  t.literal(true)
-                )
-              )
-            )
-          );
-          // AST `exports["default"]`
-          memberExpr = t.memberExpression(t.identifier("exports"), t.literal(exp.name), true);
-        } else {
-          // AST `exports.foo`
-          memberExpr = t.memberExpression(t.identifier("exports"), t.identifier(exp.name));
-        }
-
-        // Generate `exports... = something`
-        let assignmentExpr = t.assignmentExpression('=', memberExpr, exp.node);
-        let code = this.codegen(t.expressionStatement(assignmentExpr));
-        codebuf.appendCode(code, SrcLocation(exp.node, exp.file));
-      }
-    }
-  }
-
-
-  codegen(ast) {
-    var BabelGen = function() { console.warn('TODO BabelGen'); return {code:'TODO BabelGen'} };
-    return BabelGen(ast, {
-      code:              true,
-      ast:               false,
-      experimental:      true,     // enable things like ES7 features
-      compact:           this.target.mode === TARGET_MODE_RELEASE,   // "minify"
-      comments:          this.target.mode === TARGET_MODE_DEV,  // include comments in output
-      returnUsedHelpers: false,    // return information on what helpers are needed/was added
-    }).code;
+  codegen(program:ASTProgram) {
+    return babel.transform.fromAst(program, null, this.basicBabelOptions).code;
   }
 
 
@@ -371,7 +267,7 @@ class PkgCompiler {
   parseFiles(srcfiles) {
     return Promise.all(srcfiles.map(async (srcfile, index) => {
       srcfile.code = await fs.readFile(srcfile.dir + '/' + srcfile.name, 'utf8')
-      srcfile.id = srcfile.name.replace(/[^a-z0-9_]/g, '_')
+      srcfile.id   = srcfile.name.replace(/[^a-z0-9_]/g, '_')
       try {
         //var [code, sourceMap] = this.preprocessFile(srcfile);
         var code = srcfile.code;
@@ -385,7 +281,7 @@ class PkgCompiler {
   }
 
 
-  preprocessFile(srcfile:SrcFile):[string,SourceMap] {
+  preprocessFile(srcfile:SrcFile) { //:[string,SourceMap]
     var pp = new Preprocessor;
     return pp.process(srcfile);
   }
@@ -393,18 +289,58 @@ class PkgCompiler {
 
   // parseFile(srcfile:SrcFile, code:string, inSourceMap:SourceMap):ParseResult
   parseFile(srcfile, code, inSourceMap) {
-    this.log.debug('parse', this.pkg.id, '/', srcfile.name);
+    this.log.debug('parse', this.pkg.id + '/' + srcfile.name);
 
     // Babel options (http://babeljs.io/docs/usage/options/)
-    var babelOptions = {
+    // [LIMITATION] Babel can only read options that are ownProperties of the option object,
+    // meaning we can't use prototypal inheritance -- we must provide all options as own props.
+    var babelOptions = Object.assign({
+
       filename:            srcfile.name,
       inputSourceMap:      inSourceMap,
       sourceMaps:          true,     // generate SourceMap
       sourceMapTarget:     'out.map',
       sourceRoot:          srcfile.dir,
+
+      plugins: [
+        { transformer: plugins.Modules, position: 'before' }, // must be first
+        { transformer: plugins.Classes, position: 'before' },
+        { transformer: plugins.FileScope, position: 'after' }, // must be last
+      ],
+
+      // resolveModuleSource: (source, filename) => {
+      //   // gets ref e.g. "foo" from `import "foo"`. The valuer returned is used in-place
+      //   // of "foo".
+      //   console.log('TRACE resolveModuleSource', source, filename);
+      //   return source;
+      // },
+    }, this.basicBabelOptions);
+
+    // Make sure there are no "optional" transformers which are blacklisted
+    babelOptions.optional = babelOptions.optional.filter(transformerID =>
+      babelOptions.blacklist.indexOf(transformerID) === -1 )
+
+    var ctx = new CompileContext(this.pkg, srcfile, this.target, this.log);
+    babelOptions._joctx = ctx;
+    babelOptions._jofile = srcfile;
+
+    // Transform
+    // console.log('babel options', repr(babelOptions));
+    var res = babel.transform(code, babelOptions);
+    res.imports = ctx.imports;
+    // console.log('srcfile.definedIDs:', repr(srcfile.definedIDs,0))
+    // console.log('res.code:', res.code);
+    // console.log('res.imports:', repr(res.imports,1));
+    // console.log('pkg.exports:', repr(this.pkg.exports,1))
+    return res;
+  }
+
+
+  get basicBabelOptions() {
+    var options = {
       code:                true,     // output JavaScript code
       ast:                 false,    // output AST
-      compact:             false,//this.target.mode === TARGET_MODE_RELEASE,   // "minify"
+      compact:             this.target.mode === TARGET_MODE_RELEASE,   // "minify"
                                  //^ [BUG] true: broken in babel 4.7.16 (concats "yield" and "new")
       comments:            this.target.mode === TARGET_MODE_DEV,  // include comments in output
       metadataUsedHelpers: false,    // return information on what helpers are needed/was added
@@ -412,6 +348,7 @@ class PkgCompiler {
       externalHelpers:     true,
       experimental:        true,
       stage:               0, // 0=strawman 1=proposal 2=draft 3=candidate 4=finished. TODO config
+      nonStandard:         true, // Enable support for JSX and Flow
 
       // See http://babeljs.io/docs/advanced/transformers/
       blacklist: this.target.disabledTransforms([
@@ -425,201 +362,31 @@ class PkgCompiler {
       ]),
 
       optional: this.target.transforms([
-        //'jo.modules',  // must be first
         'runtime',
         'es6.spec.blockScoping',
         'es6.spec.symbols',
         'es6.spec.templateLiterals',
         'react',
         'flow',
-      ]).concat([
-        //'jo.classes',
-        //'jo.fileLocalVars', // must be last
       ]),
-
-      plugins: [
-        { transformer: plugins.Modules, position: 'before' },
-      ],
-
-      // resolveModuleSource: (source, filename) => {
-      //   // gets ref e.g. "foo" from `import "foo"`. The valuer returned is used in-place
-      //   // of "foo".
-      //   console.log('TRACE resolveModuleSource', source, filename);
-      //   return source;
-      // },
     };
 
-    // Make sure there are no "optional" transformers which are blacklisted
-    babelOptions.optional = babelOptions.optional.filter(transformerID =>
-      babelOptions.blacklist.indexOf(transformerID) === -1 )
-
-    var ctx = new CompileContext(this.pkg, srcfile, this.target, this.log);
-    babelOptions._joctx = ctx;
-
-    // Transform
-    console.log('babel options', repr(babelOptions));
-    var res = babel.transform(code, babelOptions);
-    console.log('babel.transform:', res.code);
-    res.imports = ctx.imports;
-    return res;
-  }
-
-  oldParseFile(srcfile, code, inSourceMap) {
-    var babelOptions = {};
-    var T = babel.types;
-    var BabelFile = function() { console.warn('TODO BabelFile'); };
-    var bfile = new BabelFile(babelOptions);
-
-    // sort transformers.
-    //   Note: yeah, this is messed up. Internally Babel relies on object-literal key order
-    //   of v8, so this code might break the day v8's internals changes.
-    var tKeys = [for (t of bfile.transformerStack) t.transformer.key];
-    var beforeIndex = tKeys.indexOf('utility.deadCodeElimination');
-    if (beforeIndex === -1) {
-      beforeIndex = tKeys.indexOf('_cleanUp');
-    }
-    var startKey = tKeys.indexOf('jo.modules');
-    var endKey = tKeys.indexOf('jo.fileLocalVars');
-    var joTransformers = bfile.transformerStack.splice(startKey, endKey-startKey+1);
-    joTransformers.splice(0,0, beforeIndex, 0);
-    bfile.transformerStack.splice.apply(bfile.transformerStack, joTransformers);
-
-    // Place our class explorer transformer above the es6 class transformer
-    tKeys = [for (t of bfile.transformerStack) t.transformer.key];
-    var joClassTIndex = tKeys.indexOf('jo.classes');
-    if (joClassTIndex !== -1) {
-      var es6ClassTIndex = tKeys.indexOf('es6.classes');
-      if (es6ClassTIndex !== -1 && joClassTIndex > es6ClassTIndex) {
-        bfile.transformerStack.splice(
-          es6ClassTIndex,
-          0,
-          bfile.transformerStack.splice(joClassTIndex,1)[0]
-        );
-      }
-    }
-    // console.log('transformers:', [for (t of bfile.transformerStack) t.transformer.key])
-
-    bfile.jofile = srcfile;
-    bfile.joFileIDName = '_' + srcfile.id;
-    bfile.joFirstNonImportOffset = Infinity;
-    bfile.joImports = []; // ImportDeclaration[]
-    bfile.joPkg = this.pkg;
-    bfile.joTarget = this.target;
-
-    bfile.joAddImplicitImport = function(ref, specs, node=null) {
-      // Adds the equivalent of `import name from "ref"`
-      bfile.joImports.push({
-        jo_isImplicitImport:true,
-        source:{value:ref},
-        loc: node ? node.loc : null,
-        specifiers:Object.keys(specs).map(id => {
-          return {
-            id: {name:id},
-            name: {name:specs[id]},
-            srcfile: srcfile,
-            'default': id === 'default'
-          };
-        }),
-      });
+    if (__DEV__) {
+      Object.freeze(options)
+      Object.freeze(options.blacklist);
+      Object.freeze(options.optional);
     }
 
-    bfile.joRegisterExport = (name, node, isImplicitExport=false) => {
-      var errmsg, existingExport = bfile.joPkg.exports[name];
-
-      if (existingExport) {
-        if (existingExport.node === node) {
-          // Same export. This happens for redundant "export" statements
-          if (this.log.level >= Logger.INFO) {
-            this.log.info(
-              SrcError.formatSource(
-                SrcLocation(node, bfile.jofile),
-                '"export" statement has no effect on already implicitly-exported symbol',
-                /*errname=*/null,
-                /*caretColor=*/'magenta',
-                /*linesB=*/0
-              )
-            );
-          }
-          return;
-        }
-        errmsg = (name === 'default') ?
-          'duplicate default export in package' :
-          'duplicate exported symbol in package';
-        throw ExportError(bfile.jofile, node, errmsg, null, [
-          { message: 'also exported here',
-            srcloc:  SrcLocation(existingExport.node, existingExport.file) }
-        ])
-      }
-
-      if (name === 'default') {
-        let prevExports = [], prevExportsLimit = 3;
-        Object.keys(bfile.joPkg.exports).forEach(k => {
-          var exp = bfile.joPkg.exports[k];
-          if (!exp.isImplicit && prevExports.length < prevExportsLimit) {
-            prevExports.push({
-              message: 'specific export here',
-              srcloc:  SrcLocation(exp.node, exp.file)
-            });
-          }
-        })
-        if (prevExports.length) {
-          // case: "export default" after explicit "export x"
-          throw ExportError(
-            bfile.jofile,
-            node,
-            'default export mixed with specific export',
-            null,
-            prevExports
-          );
-        }
-        // Overwrite any implicit exports
-        bfile.joPkg.exports = {};
-      } else {
-        let defaultExp = bfile.joPkg.exports['default'];
-        if (defaultExp) {
-          if (isImplicitExport) {
-            return; // simply ignore
-          }
-          throw ExportError(
-            bfile.jofile,
-            node,
-            'specific export mixed with default export',
-            null, [{
-              message: 'default export here',
-              srcloc:  SrcLocation(defaultExp.node, defaultExp.file)
-            }]
-          )
-        }
-      }
-
-      bfile.joPkg.exports[name] = {
-        name:name,
-        file:bfile.jofile,
-        node:node,
-        isImplicit:isImplicitExport
-      };
-    };
-
-    bfile.joRemappedIdentifiers = {};
-    bfile.joLocalizeIdentifier = function (name) {
-      // takes an identifier and registers it as "local" for this file, effectively
-      // prefixing the id with that of the source file name.
-      var newID = T.identifier(bfile.joFileIDName + '$' + name);
-      this.joRemappedIdentifiers[name] = newID.name;
-      return newID;
-    };
-
-    var res = bfile.parse(code);
-    res.imports = bfile.joImports;
-    // console.log('bfile.joImports:', bfile.joImports)
-
-    return /*ParseResult*/res;
+    Object.defineProperty(this, 'basicBabelOptions', {value:options})
+    return options;
   }
 
 
-  resolveInterFileDeps(srcfiles:SrcFile[]) {
+  resolveCrossFileDeps(srcfiles:SrcFile[]) {
     this._detectedDependencies = {}; // {srcfile.name: {file:srcfile.name, refNode:ASTNode}, ...}
     var pkg = this.pkg;
+
+    this.log.debug('resolving cross-file dependencies');
 
     // console.log([for (f of srcfiles)
     //   { file: f.name,
@@ -653,11 +420,7 @@ class PkgCompiler {
             // Generated by Babel
             continue;
           }
-          let err = SrcError(
-            'ReferenceError',
-            SrcLocation(node, file),
-            `unresolvable identifier "${name}"`
-          );
+          let err = RefError(file, node, `unresolvable identifier "${name}"`);
           let suggestions = this.findIDSuggestions(srcfiles, name);
           if (suggestions.length !== 0) {
             err.suggestion = this.formatIDSuggestions(suggestions);
@@ -679,8 +442,8 @@ class PkgCompiler {
     for (let srcfile of srcfiles) {
       let foundCloseMatch = false;
       for (let k in srcfile.definedIDs) {
-        let id = srcfile.definedIDs[k];
-        if (id.kind === 'module' || id.kind === 'uid' || !id.node.loc) {
+        let binding = srcfile.definedIDs[k];
+        if (binding.kind === 'module' || binding.kind === 'uid' || !binding.identifier.loc) {
           continue;
         }
         let d = 0;
@@ -690,7 +453,7 @@ class PkgCompiler {
           d = LevenshteinDistance(name, k);
         }
         if (d <= 2 && !km[k]) {
-          sv.push(km[k] = {d:d, name:k, srcloc: SrcLocation(id.node, srcfile)});
+          sv.push(km[k] = {d:d, name:k, srcloc: SrcLocation(binding.node, srcfile)});
         }
       }
       // Attempt built-in modules
@@ -722,6 +485,7 @@ class PkgCompiler {
 
 
   buildDepDescription(srcfiles:SrcFile[]) {
+    // Note: Does NOT mutate srcfiles, but does read internal state
     var intersectKeys = function(a, b) {
       return [for (k of Object.keys(a)) if (b[k]) k ];
     };
@@ -752,12 +516,9 @@ class PkgCompiler {
 
         msg += '\n    ' + this.log.style.boldYellow(fn);
 
-        for (let id of ids) {
-          let node = ref[id].id.node;
-          if (node.type === 'FunctionDeclaration' || node.type === 'ClassExpression') {
-            node = node.id;
-          }
-          let srcloc = SrcLocation(node, ref[id].file);
+        for (let name of ids) {
+          let r = ref[name];
+          let srcloc = SrcLocation(r.id.identifier, r.file);
           let ln = '\n    ';
           msg += ln + srcloc.formatCode('boldYellow', 0, 0).join(ln);
         }
@@ -776,16 +537,22 @@ class PkgCompiler {
 
 
   fileDependsOnClasses(fileA, fileB) {
-    var dep = this._detectedDependencies[fileA.name];
-    // if (dep) {
-    //   console.log('fileDependsOnClasses: dep:');
-    //   for (let o of dep) {
-    //     console.log('  ' + o.file.name);
-    //   }
-    // }
-    if (dep && dep.some(o => o.file === fileB && o.defNode.type === 'ClassExpression')) {
-      return dep;
+    var deps = this._detectedDependencies[fileA.name];
+    if (deps) {
+      // console.log('fileDependsOnClasses: '+fileA.name+' dependencies:');
+      // deps.forEach(dep => {
+      //   console.log('  file.name:                  ' + repr(dep.file.name));
+      //   console.log('  binding.identifier.name:    ' + repr(dep.binding.identifier.name,1));
+      //   console.log('  binding.kind:               ' + repr(dep.binding.kind,1));
+      //   console.log('  binding.isClassDeclaration: ' + repr(dep.binding.isClassDeclaration,1));
+      // })
+      for (let k in deps) {
+        if (deps[k].file === fileB && deps[k].binding.isClassDeclaration) {
+          return deps;
+        }
+      }
     }
+    return null;
   };
 
 
@@ -795,47 +562,67 @@ class PkgCompiler {
       return;
     }
 
-    for (let name of Object.keys(fileA.unresolvedIDs)) {
-      let definition = fileB.definedIDs[name];
-      if (definition) {
-        let classRef = fileA.unresolvedSuperclassIDs ? fileA.unresolvedSuperclassIDs[name] : null;
+    let unresolved = Object.keys(fileA.unresolvedIDs);
+    let resolved = unresolved.filter(name =>
+      this._resolveIdentifierAcrossFiles(name, fileA, fileB))
 
-        // Has inverse class dependency? (i.e. cyclic)
-        let deps;
-        if ( classRef && (deps = this.fileDependsOnClasses(fileB, fileA)) ) {
-          throw CyclicReferenceError(this.pkg, name, fileA, fileB, deps, /*onlyClasses=*/true);
-        }
-
-        // Register dependency
-        let fileDeps = this._detectedDependencies[fileA.name];
-        if (!fileDeps) {
-          this._detectedDependencies[fileA.name] = fileDeps = [];
-        }
-        fileDeps.push({
-          // This is only used for error reporting, which is why we "return" later on
-          // here, not storing all names (but just the first we find) for this dependency.
-          dependeeFile:fileA,
-          file:fileB,
-          name:name,
-          defNode:definition.node,
-          refNode:fileA.unresolvedIDs[name].node,
-        });
-
-        // Remove resolved name from list of unresolved IDs
-        if (!fileA.resolvedIDs) { fileA.resolvedIDs = {}; }
-        fileA.resolvedIDs[name] = fileA.unresolvedIDs[name];
-        if (Object.keys(fileA.unresolvedIDs).length === 1) {
-          fileA.unresolvedIDs = null;
-        } else {
-          delete fileA.unresolvedIDs[name];
-        }
-      }
+    // Remove any names that were resolved from `fileA.unresolvedIDs`
+    if (resolved.length === unresolved.length) {
+      fileA.unresolvedIDs = null;
+    } else {
+      resolved.forEach(name => { delete fileA.unresolvedIDs[name] })
     }
   }
 
 
+  _resolveIdentifierAcrossFiles(name:string, file:SrcFile, otherFile:SrcFile) {
+    let binding = otherFile.definedIDs[name];
+    if (!binding) {
+      return false; // `name` was not resolved
+    }
+
+    if (this.log.level >= Logger.DEBUG) {
+      let kind =
+        (file.unresolvedSuperclassIDs && file.unresolvedSuperclassIDs[name]) ? 'class' :
+        (binding.kind === 'hoisted' &&
+         (!binding.node || binding.node.type === 'FunctionDeclaration'))     ? 'function' :
+                                                                             binding.kind;
+      this.log.debug(
+        `resolved reference ${name} in ${file.name} to ${kind} ${name} in ${otherFile.name}`
+      )
+    }
+
+    // `name` refers to a (super)class?
+    let classRef = file.unresolvedSuperclassIDs ? file.unresolvedSuperclassIDs[name] : null;
+    if (classRef) {
+      // Check for inverse class dependency (i.e. cyclic)
+      let classDeps = this.fileDependsOnClasses(otherFile, file);
+      if (classDeps) {
+        throw CyclicRefError(this.pkg, name, file, otherFile, classDeps, /*onlyClasses=*/true);
+      }
+      delete file.unresolvedSuperclassIDs[name];
+    }
+
+    // Register file-to-file dependency
+    let fileDeps = this._detectedDependencies[file.name] ||
+                   (this._detectedDependencies[file.name] = []);
+    fileDeps.push({
+      dependeeFile: file,
+      file:         otherFile,
+      name:         name,
+      binding:      binding,
+      refNode:      file.unresolvedIDs[name].node,
+    });
+
+    if (!file.resolvedIDs) { file.resolvedIDs = {}; }
+    file.resolvedIDs[name] = file.unresolvedIDs[name];
+
+    return true; // `name` was resolved
+  }
+
+
   // Sorts files in-place based on fileDependsOn(A,B)
-  sortFiles(srcfiles:SrcFile[]):SrcFile[] {
+  sortFiles(srcfiles:SrcFile[]) { //:SrcFile[]
     // console.log('srcfiles (before sorting):', [for (f of srcfiles) f.name])
 
     // Now sort by dependencies

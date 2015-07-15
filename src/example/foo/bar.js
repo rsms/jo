@@ -3,16 +3,19 @@ import React, {Component as ReactComponent, X} from 'react'
 // import fo, {Foo, Babar, Baz} from './bar'
 // import c, {A, B as Bob} from 'bar/some'
 // let x = 1;
-import {A, B as Bob} from 'bar/some'
 // import react from 'react'
 // import * as FS from 'fs'  // equiv to `import FS from 'fs'`
 // import {ReactComponent as RC} from 'react'
 // import {Foo, bar} from 'foo'
 
+import {A, B as Bob} from 'bar/some'
+
 var a = A;
 
-export default {a:1};
-// export var foo = 1, bar;
+// export default {a:function(){ return "hello world" }};
+// export default a;
+// export default class lols {}
+export var foo = 1, bar;
 // export class exp1 {}
 // export function exp2() {}
 // export {a, b as Bob}
@@ -26,6 +29,8 @@ class Bar extends ReactComponent {
     return <p>Want a drink, {{A}}?</p>
   }
 }
+
+class Tiger extends Cat {}
 
 function MyCat3() {}
 
