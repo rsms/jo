@@ -3,37 +3,37 @@ import fs from 'fs'
 export default {
 
 // Async functions
-rename: wrap1(fs.rename),
-ftruncate: wrap1(fs.ftruncate),
-truncate: wrap1(fs.truncate),
-chown: wrap1(fs.chown),
-fchown: wrap1(fs.fchown),
-lchown: wrap1(fs.lchown),
-chmod: wrap1(fs.chmod),
-fchmod: wrap1(fs.fchmod),
-lchmod: wrap1(fs.lchmod),
+rename: wrap1(fs.rename, 'rename'),
+ftruncate: wrap1(fs.ftruncate, 'ftruncate'),
+truncate: wrap1(fs.truncate, 'truncate'),
+chown: wrap1(fs.chown, 'chown'),
+fchown: wrap1(fs.fchown, 'fchown'),
+lchown: wrap1(fs.lchown, 'lchown'),
+chmod: wrap1(fs.chmod, 'chmod'),
+fchmod: wrap1(fs.fchmod, 'fchmod'),
+lchmod: wrap1(fs.lchmod, 'lchmod'),
 stat: wrap1_ignoreENOENT(fs.stat),
 lstat: wrap1_ignoreENOENT(fs.lstat),
 fstat: wrap1_ignoreENOENT(fs.fstat),
-link: wrap1(fs.link),
-symlink: wrap1(fs.symlink),
-readlink: wrap1(fs.readlink),
-realpath: wrap1(fs.realpath),
-unlink: wrap1(fs.unlink),
-rmdir: wrap1(fs.rmdir),
-mkdir: wrap1(fs.mkdir),
+link: wrap1(fs.link, 'link'),
+symlink: wrap1(fs.symlink, 'symlink'),
+readlink: wrap1(fs.readlink, 'readlink'),
+realpath: wrap1(fs.realpath, 'realpath'),
+unlink: wrap1(fs.unlink, 'unlink'),
+rmdir: wrap1(fs.rmdir, 'rmdir'),
+mkdir: wrap1(fs.mkdir, 'mkdir'),
 mkdirs: mkdirs,
-readdir: wrap1(fs.readdir),
-close: wrap1(fs.close),
-open: wrap1(fs.open),
-utimes: wrap1(fs.utimes),
-futimes: wrap1(fs.futimes),
-fsync: wrap1(fs.fsync),
-write: wrap2(fs.write), // note: two different call signatures
-read: wrap2(fs.read),
-readFile: wrap1(fs.readFile),
-writeFile: wrap1(fs.writeFile),
-appendFile: wrap1(fs.appendFile),
+readdir: wrap1(fs.readdir, 'readdir'),
+close: wrap1(fs.close, 'close'),
+open: wrap1(fs.open, 'open'),
+utimes: wrap1(fs.utimes, 'utimes'),
+futimes: wrap1(fs.futimes, 'futimes'),
+fsync: wrap1(fs.fsync, 'fsync'),
+write: wrap2(fs.write, 'write'), // note: two different call signatures
+read: wrap2(fs.read, 'read'),
+readFile: wrap1(fs.readFile, 'readFile'),
+writeFile: wrap1(fs.writeFile, 'writeFile'),
+appendFile: wrap1(fs.appendFile, 'appendFile'),
 access: wrap1_err2bool(fs.access),
 copy: copy,
 
@@ -117,7 +117,7 @@ writeFileSync: fs.writeFileSync,
 appendFileSync: fs.appendFileSync,
 accessSync: fs.accessSync,
 
-}
+};
 
 let slice = Array.prototype.slice;
 
@@ -139,25 +139,59 @@ function wrap1_ignoreENOENT(fn) { return function() {
   })
 }}
 
-function wrap1(fn) { return function() {
-  let args = Array.prototype.slice.call(arguments);
-  return new Promise((resolve, reject) => {
-    args.push(function(err, arg1) {
-      if (err) reject(err); else resolve(arg1)
-    })
-    fn.apply(fs, args)
-  })
-}}
+function fmterr(err, e, fnname) {
+  if (err.code !== undefined) {
+    if (__DEV__) {
+      err.stack = err.message + e.stack.replace(/    at Object\./, '    at asyncfs.');
+    } else {
+      Error.captureStackTrace(err);
+      err.stack = err.stack.replace(/ at fmterr /, ' at asyncfs.'+fnname+' ');
+    }
+  }
+  return err;
+}
 
-function wrap2(fn) { return function() {
-  let args = Array.prototype.slice.call(arguments);
-  return new Promise((resolve, reject) => {
-    args.push(function(err, arg1, arg2) {
-      if (err) reject(err); else resolve([arg1, arg2])
+function wrap1(fn, fnname) {
+  return function() {
+    let args = Array.prototype.slice.call(arguments);
+    let e;
+    if (__DEV__) {
+      e = {toString(){ return ''; }};
+      Error.captureStackTrace(e);
+    }
+    return new Promise((resolve, reject) => {
+      args.push(function(err, arg1) {
+        if (err) {
+          reject(fmterr(err, e, fnname));
+        } else {
+          resolve(arg1);
+        }
+      })
+      fn.apply(fs, args)
     })
-    fn.apply(fs, args)
-  })
-}}
+  };
+}
+
+function wrap2(fn, fnname) {
+  return function() {
+    let args = Array.prototype.slice.call(arguments);
+    let e;
+    if (__DEV__) {
+      e = {toString(){ return ''; }};
+      Error.captureStackTrace(e);
+    }
+    return new Promise((resolve, reject) => {
+      args.push(function(err, arg1, arg2) {
+        if (err) {
+          reject(fmterr(err, e, fnname));
+        } else {
+          resolve([arg1, arg2]);
+        }
+      })
+      fn.apply(fs, args)
+    })
+  }
+}
 
 function wrap1_err2bool(fn) { return function() {
   let args = Array.prototype.slice.call(arguments);

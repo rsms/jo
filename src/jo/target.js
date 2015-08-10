@@ -1,18 +1,11 @@
 import {Unique} from './util'
+import {types as t} from 'npmjs.com/babel-core'
+import 'jo/helpers'
 
-const TARGET_BROWSER        = 'browser'
-const TARGET_BROWSER_WEBKIT = 'browser-webkit'
-const TARGET_NODEJS         = 'nodejs'
-
-const TARGET_MODE_DEV       = 'dev'
-const TARGET_MODE_RELEASE   = 'release'
+const TARGET_MODE_DEV     = 'dev'
+const TARGET_MODE_RELEASE = 'release'
 
 var Targets = {};
-
-// interface Program {
-//   code:string
-//   map:SourceMap
-// }
 
 // record TargetOptions {
 //   logger:Logger
@@ -27,8 +20,13 @@ type TargetOptions = {
 var TargetOptions = _$record("TargetOptions", {
   logger: undefined, // Logger
   output: null,      // string
+  globals: null,     // string[]
   warningsAsErrors: false, // bool
+  staticLinking: false, // bool
 });
+
+var runtimeHelpersIDName = "_$rt";
+var runtimeHelpersID = Object.freeze(t.identifier(runtimeHelpersIDName));
 
 // Global names
 // Based on https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects
@@ -36,6 +34,7 @@ const GLOBAL_STD          = 1; // standard
 const GLOBAL_DEPRECATED   = 2; // should not be used, causes log messages
 const GLOBAL_UNSAFE       = 4; // dangerous to use, causes log messages
 const GLOBAL_EXPERIMENTAL = 8; // might not be available or is an ES proposal
+const GLOBAL_USER         = 16; // added by user via e.g. -globals
 
 var globalJSNames = {
   // Values
@@ -62,7 +61,7 @@ var globalJSNames = {
   'Object':GLOBAL_STD,
   'Function':GLOBAL_STD,
   'Boolean':GLOBAL_STD,
-  'Symbol ':GLOBAL_STD,
+  'Symbol':GLOBAL_STD,
   'Error':GLOBAL_STD,
   'EvalError':GLOBAL_STD,
   'InternalError':GLOBAL_STD,
@@ -121,6 +120,9 @@ var globalJSNames = {
 
   // Other
   'arguments':GLOBAL_STD,
+
+  // Jo
+  [runtimeHelpersIDName]:GLOBAL_STD,
 }
 
 class Target {
@@ -136,7 +138,7 @@ class Target {
         `unknown target identifier "${id}" (available targets: ${Object.keys(Targets)})`
       )
     }
-    return new TargetType(id, mode, options);
+    return new TargetType(id, mode, TargetOptions(options));
   }
 
   constructor(id, mode, options) {
@@ -145,9 +147,10 @@ class Target {
     this.options = options;
     this.globals = {__proto__:globalJSNames};
     this.builtInModuleRefs = {};
-    if (options.globals && options.globals instanceof Array) {
+    this._joHelpers = {}; // cache
+    if (options.globals) {
       for (let globalName of options.globals) {
-        this.globals[globalName] = 1;
+        this.globals[globalName] = GLOBAL_USER;
       }
     }
   }
@@ -184,9 +187,14 @@ class Target {
     return this.id + '.' + this.mode;
   }
 
-  moduleForPackage(pkg:Pkg, depLevel:int) {
+  moduleForPackage(pkg:Pkg, depLevel:int) { //:Module
     // Override this to return an alternate module for a package
-    return new Module({ file: this.moduleFilename(pkg, depLevel) });
+    return new Module({ filename: this.moduleFilename(pkg, depLevel) });
+  }
+
+
+  testModuleForPackage(pkg:Pkg) { //:Module
+    throw new Error('target "'+this.id+'" does not support testing')
   }
 
 
@@ -210,7 +218,7 @@ class Target {
     // Transforms based on "debug" or "release" build settings:
     if (this.mode === TARGET_MODE_RELEASE) {
       transforms = transforms.concat([
-        'minification.deadCodeElimination',
+        // 'minification.deadCodeElimination', // BUG: stripts out non-exported top-level functions
         // 'minification.constantFolding',
         // 'minification.memberExpressionLiterals',
         // 'minification.propertyLiterals',
@@ -240,7 +248,7 @@ class Target {
     var visit = function(pkg) {
       if (pkg.dir in visited) return;
       visited[pkg.dir] = true;
-      let runtimeMods = pkg.pkgInfo ? pkg.pkgInfo['babel-runtime'] : null;
+      let runtimeMods = pkg.module.info ? pkg.module.info['importsrt'] : null;
       if (runtimeMods) {
         runtimeModules = runtimeModules.concat(runtimeMods);
       }
@@ -253,6 +261,12 @@ class Target {
   }
 
 
+  helpersObjectASTForFile(srcfile:SrcFile) {
+    // Override to provide alternate AST for helpers
+    return runtimeHelpersID;
+  }
+
+
   runtimeHelperSourceFilename(ref) {
     var basedir = Env.JOROOT + '/node_modules/babel-runtime/';
     if (ref === 'regenerator') {
@@ -262,24 +276,67 @@ class Target {
     }
   }
 
+  // preMake is called once before packages are built
+  //async preMake(pkgs:Pkg[]) {}
+
+  // preCompileModule is called before a package's module is compiled, but after the module's
+  // files have been compiled.
+  preCompileModule(pkg:Pkg, module:Module, srcfiles:SrcFile[], depLevel:int) {}
+
+  // Allows adding any code to the beginning and/or end of a package's module code
+  //pkgModuleHeader(pkg:Pkg, module:Module, depLevel:int):string {}
+  //pkgModuleFooter(pkg:Pkg, module:Module, depLevel:int):string {}
+
+  // postCompileModule is called after a package's module has been compiled.
+  async postCompileModule(pkg:Pkg, module:Module, srcfiles:SrcFile[], depLevel:int) {
+    let log = this.log;
+    if (log.level >= Logger.DEBUG) {
+      log.debug(
+        'write', module.typeName, log.style.boldMagenta(module.filename),
+        'of package', log.style.boldGreen(pkg.id)
+      )
+    }
+    await module.write();
+  }
+
   // Allows modifying the code of precompiled modules
   //filterPrecompiledModuleCode(pkg:Pkg, code:string):string {}
 
-  // preMake is called before any packages are built
-  //async preMake(pkgs) {}
+  // postMake is called once, if defined, after all packages and dependencies have been
+  // successfully built. The target might choose to perform some kind of post-processing
+  // at this stage. Or not.
+  //async postMake(pkgs:Pkg[]) {}
 
-  // Allows adding any code to the beginning and/or end of a package's module code
-  //pkgModuleHeader(pkg:Pkg, depLevel:int):string {}
-  //pkgModuleFooter(pkg:Pkg, depLevel:int):string {}
 
-  // postCompile iscalled after a package has been compiled, but before it's written
-  // to disk. The package has a valid and complete Module at this time. You might modify
-  // the module code and/or source map.
-  // postCompile(pkg:Pkg, depLevel:int) {}
+  joHelper(name:string) { //:ASTNode?
+    let helper = this._joHelpers[name];
+    if (!helper) {
+      helper = helpers['Helper_' + name];
+      if (!helper) {
+        throw new Error('unknown jo helper "'+name+'"');
+      }
+      this._joHelpers[name] = helper = new helper(name);
+      helper.idNode = t.identifier('jo$'+name);
+    }
+    return helper;
+  }
 
-  // postMake is called after all packages and dependencies have been successfully compiled.
-  // The target might choose to perform some kind of post-processing at this stage. Or not.
-  // (pkgs:Pkg[])
-  //async postMake(pkgs) {}
+  joHelperAccessNode(helper:JoHelper) { //:ASTNode?
+    return t.memberExpression(runtimeHelpersID, helper.idNode);
+  }
+
+  genJoHelpers(helpers:Set<JoHelper>, codebuf:CodeBuffer2) {
+    helpers.forEach(helper => {
+      let [code, map] = helper.gen();
+      if (code) {
+        codebuf.append(runtimeHelpersIDName + '.' + helper.idNode.name + ' = ');
+        if (map) {
+          codebuf.appendMapped(code, map);
+        } else {
+          codebuf.append(code);
+        }
+      }
+    });
+  }
 
 }

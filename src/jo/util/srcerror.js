@@ -1,4 +1,5 @@
 import 'util'
+import 'term'
 
 function SrcError(name, srcloc, message, suggestion, related) {
   if (!(this instanceof SrcError)) {
@@ -42,6 +43,10 @@ function ExportError(file, node, message, fixSuggestion, related) {
   return SrcError('ExportError', SrcLocation(node, file), message, fixSuggestion, related);
 }
 
+function SyntaxError(file, node, message, fixSuggestion, related) {
+  return SrcError('SyntaxError', SrcLocation(node, file), message, fixSuggestion, related);
+}
+
 function CyclicRefError(pkg, name, fileA, fileB, deps, onlyClasses:bool) {
   let errs = [
     { message: `"${name}" defined here`,
@@ -69,7 +74,7 @@ function CyclicRefError(pkg, name, fileA, fileB, deps, onlyClasses:bool) {
 }
 
 function styleCodeQuotes(s) {
-  var S = TermStyle.stderr;
+  var S = term.StderrStyle;
   return S.enabled ? s.replace(/`([^`]*)`/g, (_, m) => S.cyan(m) ) : s;
 }
 
@@ -82,7 +87,7 @@ SrcError.canFormat = function(err) {
 
 
 SrcError.formatSource = function(srcloc, message, errname, caretColor, linesB, linesA, indent) {
-  var S = TermStyle.stderr;
+  var S = term.StderrStyle;
   if (!indent) indent = '';
   var msg = indent;
   if (srcloc && srcloc.filename) {
@@ -92,7 +97,7 @@ SrcError.formatSource = function(srcloc, message, errname, caretColor, linesB, l
   if (errname) {
     msg += ' ' + S.grey('('+errname+')');
   }
-  if (srcloc.code && srcloc.startLine !== undefined) {
+  if (srcloc && srcloc.code && srcloc.startLine !== undefined) {
     msg += '\n' + indent + srcloc.formatCode(caretColor, linesB, linesA).join('\n'+indent);
   }
   return msg;
@@ -114,7 +119,7 @@ function srclocForError(err) {
 
 function formatSuggestion(suggestion:string, indent:string) {
   return indent +
-         TermStyle.stderr.bold(styleCodeQuotes(suggestion.replace(/\n/mg, indent))) +
+         term.StderrStyle.bold(styleCodeQuotes(suggestion.replace(/\n/mg, indent))) +
          '\n';
 }
 

@@ -1,4 +1,4 @@
-/pkg/*.dev
+/pkg
 /bin/*-g
 /node_modules
 *.jopkg.*

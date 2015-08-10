@@ -2,22 +2,44 @@
   "name": "jo",
   "version": "0.0.6",
   "description": "Go-style JavaScript ES6 package compiler",
-  "keywords": ["es6", "go", "compiler", "babel"],
-  "license": {"type":"MIT","url":"https://github.com/rsms/jo/#mit-license"},
+  "keywords": [
+    "es6",
+    "go",
+    "compiler",
+    "babel"
+  ],
+  "license": "MIT",
   "homepage": "https://github.com/rsms/jo/#readme",
   "author": [
-    {"name":"Rasmus Andersson", "url":"http://rsms.me/"}
+    {
+      "name": "Rasmus Andersson",
+      "url": "http://rsms.me/"
+    }
   ],
-  "repository": {"type":"git","url":"https://github.com/rsms/jo.git"},
-  "engines": {"node": ">=0.11 <=0.12"},
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rsms/jo.git"
+  },
+  "engines": {
+    "node": ">=0.11 <=0.12"
+  },
   "preferGlobal": true,
   "dependencies": {
     "babel-core": "^5.6.15",
-    "babel-runtime": "^5.6.15",
+    "core-js": "^1.0.0",
     "source-map": "^0.4.3",
-    "source-map-support": "^0.3.2"
+    "source-map-support": "^0.3.2",
+    "sweet.js": "^0.7.4",
+    "webworker-threads": "^0.5.6"
   },
-  "bin": {"jo": "bin/jo"},
+  "bin": {
+    "jo": "bin/jo"
+  },
   "main": "pkg/nodejs.release/jo/index.js",
-  "files": [ "bin/jo", "pkg/nodejs.release", "pkg/npm/npmjs.com", "src" ]
+  "files": [
+    "bin/jo",
+    "pkg/nodejs.release",
+    "pkg/npm/npmjs.com",
+    "src"
+  ]
 }

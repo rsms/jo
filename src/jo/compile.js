@@ -1,60 +1,18 @@
 import fs from 'asyncfs'
 import path from 'path'
-import * as babel from 'npmjs.com/babel-core'
-//import BabelFile from 'npmjs.com/babel/lib/babel/transformation/file';
-// import Transformer from 'npmjs.com/babel/lib/babel/transformation/transformer'
-// import BabelGen from 'npmjs.com/babel/lib/babel/generation'
+import babel from 'npmjs.com/babel-core'
 import plugins from './transformers'
-// {
-//   ModulePlugIn,
-//   FileLocalVarsTransformer,
-//   ClassHierarchyTransformer
-// } from 
+import 'assert'
+import 'tsort'
 import {
-  JSIdentifier,
-  SrcError,
   SrcErrors,
   RefError,
-  ExportError,
   CyclicRefError,
   SrcLocation,
-  repr,
   Unique,
   LevenshteinDistance,
-  TermStyle,
 } from './util'
-
-// Register jo transformers (wish there was a non-mutating API for this)
-// babel.transform.transformers['jo.classes'] =
-//   new Transformer('jo.classes', ClassHierarchyTransformer);
-// babel.transform.transformers['jo.modules'] =
-//   new Transformer('jo.modules', ModuleTransformer);
-// babel.transform.transformers['jo.fileLocalVars'] =
-//   new Transformer('jo.fileLocalVars', FileLocalVarsTransformer);
-
-
-
-
-// interface SrcFile {
-//   dir:string       // e.g. "/abs/path/foo"
-//   relpath:string   // e.g. "foo/bar.js"
-//   name:string      // e.g. "bar.js"
-//   st:fs.Stat
-//   files:SrcFile[]  // if st.isDirectory()
-// }
-
-// interface Pkg {
-//   imports:{pkgref: [Import], ...},
-//   exports:{identifier: Export, ...},
-//   build:Build
-//   files:SrcFile[]
-// }
-
-// interface SrcOrigin {
-//   file:SrcFile
-//   start:{line:int, column:int}
-//   end:{line:int, column:int}
-// }
+import 'term'
 
 // interface Import {
 //   ref:string                      // e.g. `import "lol/foo"` => 'lol/foo'
@@ -72,51 +30,51 @@ import {
 //   node:ASTNode     // the export node
 // }
 
-// interface Build {
-//   pkgdir:string    // e.g. "/abs/path"
-//   output:string    // e.g. "/abs/path.html"
-//   template:string  // e.g. "/abs/path.html"
-// }
+type ParseResult = {
+  imports:ASTImportDeclaration[];
+  code:string;
+  map:SourceMap;
+};
 
-// interface Program {
-//   usedHelpers:string[]  // e.g. ['class-call-check', 'inherits', 'create-class']
-//   ast:AST
-//   map:SourceMap
-//   code:string
-// }
+type ModuleBasedOn = {
+  module:Module;
+  srcfiles:SrcFile[];
+};
 
-// interface ParseResult {
-//   imports:ASTImportDeclaration[]
-//   code:string
-//   map:SourceMap
-// }
 
-class PkgCompiler {
+class ModuleCompiler {
 
-  constructor(pkg:Pkg, mod:Module, target:Target, depLevel:int) {
+  constructor(pkg:Pkg, module:Module, basedOn?:ModuleBasedOn, target:Target, depLevel:int) {
     this.pkg = pkg
-    this.module = mod
+    this.module = module
+    this.basedOn = basedOn
     this.target = target
     this.log = this.target.log
-    this.depLevel = depLevel;
+    this.depLevel = depLevel
     this._nextAnonID = 0;
   }
 
-  // async compile(srcfiles:SrcFile[]):CodeBuffer
-  async compile(srcfiles) {
+
+  async compile(srcfiles:SrcFile[]) { //:CodeBuffer
     // load code and ast for each source file of the package
     await this.parseFiles(srcfiles)
 
     // Resolve cross-file dependencies (e.g. fileC -> fileA -> fileB)
-    this.resolveCrossFileDeps(srcfiles)
+    let depGraph = this.resolveCrossFileDeps(srcfiles)
 
-    // Sort srcfiles by symbol dependency
-    srcfiles = this.sortFiles(srcfiles);
+    // Sort srcfiles by symbol dependencies
+    srcfiles = this.sortFiles(srcfiles, depGraph);
 
     // Log some details about inter-file deps
     if (this.log.level >= Logger.DEBUG) {
-      this.log.debug(this.buildDepDescription(srcfiles));
+      let [msg, filenames] = this.buildDepDescription(srcfiles);
+      if (filenames.length !== 0) {
+        this.log.debug(msg);
+      }
     }
+
+    // Run target.preCompileModule
+    this.target.preCompileModule(this.pkg, this.module, srcfiles, this.depLevel)
 
     // Code buffer we'll use to build module code
     var codebuf = new CodeBuffer(path.resolve(this.pkg.dir), this.target);
@@ -133,54 +91,30 @@ class PkgCompiler {
     // Add footer
     this.genFooter(srcfiles, codebuf);
 
-    // console.log(codebuf.code);
+    // Note: target.postCompileModule runs from BuildCtx.compileModule
+
     return codebuf;
   }
 
 
-  groupedImports(srcfiles:SrcFile[]) { //:[runtimeImps:{ref=Imp},importRefs:{ref=Imp[]}]
-    // Contains a mapping from runtime helper ref => last import
-    var runtimeImps = {};
-
+  importsForSrcFiles(srcfiles:SrcFile[]) { //:{ref=>Imp[]}
     // Maps unique import refs to list of imports
     var importRefs = {};
 
     // Sort by unique refs, and separate runtime helpers
-    for (let i = 0, L = srcfiles.length; i !== L; ++i) {
-      let srcfile = srcfiles[i];
-      let imports = srcfile.parsed.imports;
-      for (let imp of imports) {
-        if (imp.jo_isRuntimeHelper) {
-          runtimeImps[imp.source.value] = imp;
+    for (let srcfile of srcfiles) {
+      for (let imp of srcfile.parsed.imports) {
+        imp.srcfile = srcfile;
+        let impRefs = importRefs[imp.source.value];
+        if (impRefs) {
+          impRefs.push(imp);
         } else {
-          imp.srcfile = srcfile;
-          let impRefs = importRefs[imp.source.value];
-          if (impRefs) {
-            impRefs.push(imp);
-          } else {
-            importRefs[imp.source.value] = impRefs = [imp];
-          }
+          importRefs[imp.source.value] = [imp];
         }
       }
     }
 
-    return [runtimeImps, importRefs]
-  }
-
-
-  genPkgInfo(runtimeImps, importRefs) {
-    // Gen pkginfo header
-    var runtimeRefPrefixLen = 'babel-runtime/'.length;
-    var runtimeRefs = Object.keys(runtimeImps).map(ref => ref.substr(runtimeRefPrefixLen) );
-    return {
-      files:     this.pkg.files,
-      imports:   Object.keys(importRefs),
-      importsrt: runtimeRefs,
-      exports:   Object.keys(this.pkg.exports),
-      implv:     Date.now().toString(36), // FIXME: code content hash?
-      apiv:      Date.now().toString(36), // FIXME: API hash?
-      main:      this.pkg.hasMainFunc,
-    };
+    return importRefs;
   }
 
 
@@ -191,14 +125,20 @@ class PkgCompiler {
     //    var file2$c = _$1.c;
 
     // Unique and separate runtime and import refs
-    var [runtimeImps, importRefs] = this.groupedImports(srcfiles)
+    var importRefs = this.importsForSrcFiles(srcfiles);
 
-    // Generate pkginfo
-    this.pkg.pkgInfo = this.genPkgInfo(runtimeImps, importRefs);
+    // Add testing to test modules w/o explicit import
+    if (this.module instanceof TestModule && !importRefs['testing']) {
+      importRefs['testing'] = [ mkimport({ref: 'testing', specs: {}, isImplicit: true}) ];
+    }
+
+    // Generate info and add pkg header
+    this.module.info = this.module.makeInfo(srcfiles, importRefs);
+    codebuf.appendLine('//#jopkg'+JSON.stringify(this.module.info));
 
     // Allow target to add any code to the header at this point
     if (this.target.pkgModuleHeader) {
-      let targetHeaderCode = this.target.pkgModuleHeader(this.pkg, this.depLevel);
+      let targetHeaderCode = this.target.pkgModuleHeader(this.pkg, this.module, this.depLevel);
       if (targetHeaderCode) {
         targetHeaderCode.trim().split(/\r?\n/g).forEach(line => {
           codebuf.appendLine(line);
@@ -206,16 +146,14 @@ class PkgCompiler {
       }
     }
 
-    // Add pkginfo line
-    codebuf.appendLine('//#jopkg'+JSON.stringify(this.pkg.pkgInfo));
-
     // Add imports
-    if (Object.keys(runtimeImps).length !== 0 || Object.keys(importRefs).length !== 0) {
-      // Add runtime helpers
-      codebuf.addRuntimeImports(runtimeImps, Object.keys(importRefs).length===0);
-
+    if (Object.keys(importRefs).length !== 0) {
       // Add regular imports and assign {ref: [name, name ...]} to pkg.imports
-      this.pkg.imports = codebuf.addModuleImports(importRefs);
+      let imports = codebuf.addModuleImports(importRefs);
+      if (this.module === this.pkg.module) {
+        // So that we don't set imports from pkg.testModule
+        this.pkg.imports = imports;
+      }
       // console.log('pkg.imports:', repr(this.pkg.imports,2));
     }
   }
@@ -234,7 +172,7 @@ class PkgCompiler {
 
     // Add any target footer
     if (this.target.pkgModuleFooter) {
-      let s = this.target.pkgModuleFooter(this.pkg, this.depLevel);
+      let s = this.target.pkgModuleFooter(this.pkg, this.module, this.depLevel);
       if (s) {
         s.trim().split(/\r?\n/g).forEach(line => {
           codebuf.appendLine(line);
@@ -243,8 +181,8 @@ class PkgCompiler {
     }
 
     // Source map directive (must be last)
-    if (this.module.file) {
-      codebuf.appendLine('//#sourceMappingURL='+path.basename(this.module.file)+'.map');
+    if (this.module.filename) {
+      codebuf.appendLine('//#sourceMappingURL='+path.basename(this.module.filename)+'.map');
     }
   }
 
@@ -252,14 +190,22 @@ class PkgCompiler {
   genExports(srcfiles:SrcFile[], codebuf:CodeBuffer) {
     // Exports for this package sorted by name so that generated code changes as little as possible
     let codegen = this.codegen.bind(this);
-    Object.keys(this.pkg.exports).sort().forEach(name => {
-      codebuf.appendExport(this.pkg.exports[name], codegen)
+    let asTest = (this.module instanceof TestModule);
+    if (__DEV__) { var seenExports = new Set; }
+    srcfiles.forEach(f => {
+      if (f.exports) {
+        for (let [k, exp] of f.exports) {
+          if (__DEV__) { assert(!seenExports.has(k)); seenExports.add(k); }
+          codebuf.appendExport(exp, codegen, asTest);
+        }
+      }
     })
   }
 
 
   codegen(program:ASTProgram) {
-    return babel.transform.fromAst(program, null, this.basicBabelOptions).code;
+    let opts = Object.assign({}, this.basicBabelOptions); // b/c babel mutates the object(!)
+    return babel.transform.fromAst(program, null, opts).code;
   }
 
 
@@ -269,7 +215,6 @@ class PkgCompiler {
       srcfile.code = await fs.readFile(srcfile.dir + '/' + srcfile.name, 'utf8')
       srcfile.id   = srcfile.name.replace(/[^a-z0-9_]/g, '_')
       try {
-        //var [code, sourceMap] = this.preprocessFile(srcfile);
         var code = srcfile.code;
         var sourceMap = null;
         srcfile.parsed = this.parseFile(srcfile, code, sourceMap);
@@ -281,16 +226,8 @@ class PkgCompiler {
   }
 
 
-  preprocessFile(srcfile:SrcFile) { //:[string,SourceMap]
-    var pp = new Preprocessor;
-    return pp.process(srcfile);
-  }
-
-
-  // parseFile(srcfile:SrcFile, code:string, inSourceMap:SourceMap):ParseResult
-  parseFile(srcfile, code, inSourceMap) {
+  parseFile(srcfile:SrcFile, code:string, inSourceMap:SourceMap) { //:ParseResult
     this.log.debug('parse', this.pkg.id + '/' + srcfile.name);
-
     // Babel options (http://babeljs.io/docs/usage/options/)
     // [LIMITATION] Babel can only read options that are ownProperties of the option object,
     // meaning we can't use prototypal inheritance -- we must provide all options as own props.
@@ -299,12 +236,11 @@ class PkgCompiler {
       filename:            srcfile.name,
       inputSourceMap:      inSourceMap,
       sourceMaps:          true,     // generate SourceMap
-      sourceMapTarget:     'out.map',
+      // sourceMapTarget:     'out.map',
       sourceRoot:          srcfile.dir,
 
       plugins: [
-        { transformer: plugins.Modules, position: 'before' }, // must be first
-        { transformer: plugins.Classes, position: 'before' },
+        { transformer: plugins.Init, position: 'before' }, // must be first
         { transformer: plugins.FileScope, position: 'after' }, // must be last
       ],
 
@@ -320,7 +256,7 @@ class PkgCompiler {
     babelOptions.optional = babelOptions.optional.filter(transformerID =>
       babelOptions.blacklist.indexOf(transformerID) === -1 )
 
-    var ctx = new CompileContext(this.pkg, srcfile, this.target, this.log);
+    var ctx = new CompileContext(this.pkg, this.module, srcfile, this.target, this.log);
     babelOptions._joctx = ctx;
     babelOptions._jofile = srcfile;
 
@@ -328,10 +264,17 @@ class PkgCompiler {
     // console.log('babel options', repr(babelOptions));
     var res = babel.transform(code, babelOptions);
     res.imports = ctx.imports;
-    // console.log('srcfile.definedIDs:', repr(srcfile.definedIDs,0))
-    // console.log('res.code:', res.code);
-    // console.log('res.imports:', repr(res.imports,1));
-    // console.log('pkg.exports:', repr(this.pkg.exports,1))
+
+    // if (srcfile.name === 'main.js') {
+    //   console.log('srcfile.definedIDs:', repr(srcfile.definedIDs,0))
+    //   console.log('input code:', code);
+    //   console.log('res.code:', res.code);
+    //   console.log('res.imports:', repr(res.imports,1));
+    //   console.log('module.exports:', repr(this.module.exports,1))
+    //   console.log('metadata:', repr(res.metadata,5))
+    //   process.exit(3);
+    // }
+
     return res;
   }
 
@@ -343,12 +286,13 @@ class PkgCompiler {
       compact:             this.target.mode === TARGET_MODE_RELEASE,   // "minify"
                                  //^ [BUG] true: broken in babel 4.7.16 (concats "yield" and "new")
       comments:            this.target.mode === TARGET_MODE_DEV,  // include comments in output
-      metadataUsedHelpers: false,    // return information on what helpers are needed/was added
-      modules:             'ignore',
       externalHelpers:     true,
+      // metadataUsedHelpers: true,    // return information on what helpers are needed/was added
+      modules:             'ignore',
       experimental:        true,
       stage:               0, // 0=strawman 1=proposal 2=draft 3=candidate 4=finished. TODO config
       nonStandard:         true, // Enable support for JSX and Flow
+      loose:               [],  // disallows import/exports beyond head and return at root
 
       // See http://babeljs.io/docs/advanced/transformers/
       blacklist: this.target.disabledTransforms([
@@ -362,7 +306,6 @@ class PkgCompiler {
       ]),
 
       optional: this.target.transforms([
-        'runtime',
         'es6.spec.blockScoping',
         'es6.spec.symbols',
         'es6.spec.templateLiterals',
@@ -382,11 +325,13 @@ class PkgCompiler {
   }
 
 
-  resolveCrossFileDeps(srcfiles:SrcFile[]) {
+  resolveCrossFileDeps(srcfiles:SrcFile[]) { // :tsort.DAG
     this._detectedDependencies = {}; // {srcfile.name: {file:srcfile.name, refNode:ASTNode}, ...}
     var pkg = this.pkg;
 
     this.log.debug('resolving cross-file dependencies');
+
+    var depGraph = new tsort.DAG;
 
     // console.log([for (f of srcfiles)
     //   { file: f.name,
@@ -394,7 +339,7 @@ class PkgCompiler {
     //     definedIDs: f.definedIDs ? Object.keys(f.definedIDs) : null
     //   } ]);
 
-    // First pass: resolve symbols for each file with each other file. E.g. for A,B,C:
+    // Resolve symbols for each file with each other file. E.g. for A,B,C:
     //   test if A needs B
     //   test if A needs C
     //   test if B needs A
@@ -402,36 +347,168 @@ class PkgCompiler {
     //   test if C needs A
     //   test if C needs B
     //
+    let failedFiles = null; //SrcFile[]
     for (let x = 0; x !== srcfiles.length; x++) {
-      for (let y = 0; y !== srcfiles.length; y++) {
-        if (x !== y) {
-          this._resolveFileDeps(srcfiles[x], srcfiles[y]);
+      let fileA = srcfiles[x];
+      if (fileA.unresolvedIDs) {
+        // console.log('attempt resolve', fileA.name, Object.keys(fileA.unresolvedIDs))
+        let isResolved = this._resolveFileDepsv(fileA, srcfiles, depGraph);
+        if (!isResolved && this.basedOn) {
+          // attempt resolving with basedOn.srcfiles
+          isResolved = this._resolveFileDepsv(fileA, this.basedOn.srcfiles, depGraph);
+        }
+        if (!isResolved) {
+          if (__DEV__) { assert(fileA.unresolvedIDs); }
+          if (failedFiles) {
+            failedFiles.push(fileA);
+          } else {
+            failedFiles = [fileA];
+          }
         }
       }
     }
 
-    // Check for unresolved IDs
-    var errs = [];
-    srcfiles.forEach(file => {
-      if (file.unresolvedIDs && Object.keys(file.unresolvedIDs).length !== 0) {
-        for (let name of Object.keys(file.unresolvedIDs)) {
-          let node = file.unresolvedIDs[name].node;
-          if (!node.loc) {
-            // Generated by Babel
-            continue;
-          }
-          let err = RefError(file, node, `unresolvable identifier "${name}"`);
-          let suggestions = this.findIDSuggestions(srcfiles, name);
-          if (suggestions.length !== 0) {
-            err.suggestion = this.formatIDSuggestions(suggestions);
-          }
-          errs.push(err);
-        }
-      }
-    });
-    if (errs.length !== 0) {
+    if (failedFiles) {
+      let errs = this._makeUnresolvableIDErrors(failedFiles);
+      assert(errs.length !== 0);
       throw SrcErrors(errs);
     }
+
+    return depGraph;
+  }
+
+
+  _resolveFileDepsv(fileA:SrcFile, srcfiles:SrcFile[], depGraph:DAG) { //:bool -- resolved all?
+    for (let y = 0; y !== srcfiles.length; y++) {
+      let fileB = srcfiles[y];
+      if (fileA !== fileB && fileB.definedIDs) {
+        if (this._resolveFileDeps(fileA, fileB, depGraph)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+
+  _resolveFileDeps(fileA, fileB, depGraph:DAG) { //:bool -- resolved all?
+    // console.log('_resolveFileDeps:', fileA.name, '=>', fileB.name);
+    let unresolved = Object.keys(fileA.unresolvedIDs);
+    let resolved = unresolved.filter(name =>
+      this._resolveIdentifierAcrossFiles(name, fileA, fileB, depGraph))
+
+    // Remove any names that were resolved from `fileA.unresolvedIDs`
+    if (resolved.length === unresolved.length) {
+      fileA.unresolvedIDs = null;
+      return true;
+    } else {
+      resolved.forEach(name => { delete fileA.unresolvedIDs[name] })
+      // console.log('_resolveFileDeps: failed to resolve:', fileA.unresolvedIDs,
+      //             '(did resolve:', resolved, ')');
+      return false;
+    }
+  }
+
+
+  _makeUnresolvableIDErrors(srcfiles:SrcFile[]) {
+    var errs = [];
+    srcfiles.forEach(file => {
+      if (__DEV__) {
+        assert(file.unresolvedIDs);
+        assert(Object.keys(file.unresolvedIDs).length !== 0);
+      }
+      for (let name in file.unresolvedIDs) {
+        let node = file.unresolvedIDs[name].node;
+        let err = RefError(file, node, `unresolvable identifier "${name}"`);
+        let suggestions = this.findIDSuggestions(srcfiles, name);
+        if (suggestions.length !== 0) {
+          err.suggestion = this.formatIDSuggestions(suggestions);
+        }
+        errs.push(err);
+      }
+    });
+    return errs;
+  }
+
+
+  _handleOnCyclicDepError(fileA, fileB) {
+    let errs = [];
+    let findErrs = (fileA, fileB) => {
+      for (let name in fileA.definedIDs) {
+        let ref = fileB.unresolvedIDs && fileB.unresolvedIDs[name] ||
+                  fileB.resolvedIDs && fileB.resolvedIDs[name];
+        if (ref && ref.level === 0) {
+          errs.push({
+            message: `"${name}" defined here`,
+            srcloc:  SrcLocation(fileA.definedIDs[name].identifier, fileA)
+          });
+          errs.push({
+            message: `"${name}" referenced here`,
+            srcloc:  SrcLocation(ref.node, fileB)
+          });
+        }
+      }
+    };
+    findErrs(fileA, fileB);
+    findErrs(fileB, fileA);
+    throw RefError(
+      null,
+      null,
+      `cyclic dependency between source files "${fileA.name}" and "${fileB.name}"`+
+      ` in package "${this.pkg.id}"`,
+      errs
+    );
+  }
+
+
+  _resolveIdentifierAcrossFiles(name:string, file:SrcFile, otherFile:SrcFile, depGraph:DAG) {
+    let binding = otherFile.definedIDs[name];
+    if (!binding) {
+      return false; // `name` was not resolved
+    }
+
+    if (this.log.level >= Logger.DEBUG) {
+      let kind =
+        (file.unresolvedSuperclassIDs && file.unresolvedSuperclassIDs[name]) ? 'class' :
+        (binding.kind === 'hoisted' &&
+         (!binding.node || binding.node.type === 'FunctionDeclaration'))     ? 'function' :
+                                                                             binding.kind;
+      this.log.debug(
+        `resolved reference ${name} in ${file.name} to ${kind} ${name} in ${otherFile.name}`
+      )
+    }
+
+    if (file.unresolvedIDs[name].level === 0) {
+      // program-level reference creates a hard dependency
+      depGraph.add(file, otherFile); // file --[depends on]--> otherFile
+    }
+
+    // `name` refers to a (super)class?
+    let classRef = file.unresolvedSuperclassIDs ? file.unresolvedSuperclassIDs[name] : null;
+    if (classRef) {
+      // Check for inverse class dependency (i.e. cyclic)
+      let classDeps = this.fileDependsOnClasses(otherFile, file);
+      if (classDeps) {
+        throw CyclicRefError(this.pkg, name, file, otherFile, classDeps, /*onlyClasses=*/true);
+      }
+      delete file.unresolvedSuperclassIDs[name];
+    }
+
+    // Register file-to-file dependency
+    let fileDeps = this._detectedDependencies[file.name] ||
+                   (this._detectedDependencies[file.name] = []);
+    fileDeps.push({
+      dependeeFile: file,
+      file:         otherFile,
+      name:         name,
+      binding:      binding,
+      refNode:      file.unresolvedIDs[name].node,
+    });
+
+    if (!file.resolvedIDs) { file.resolvedIDs = {}; }
+    file.resolvedIDs[name] = file.unresolvedIDs[name];
+
+    return true; // `name` was resolved
   }
 
 
@@ -475,9 +552,9 @@ class PkgCompiler {
     return 'Did you mean' + (suggestions.length > 1 ? ':\n  ' : ' ') +
       suggestions.map(s => {
         if (s.isModule) {
-          return 'built-in module "' + TermStyle.stdout.boldCyan(s.name) + '"'
+          return 'built-in module "' + term.StderrStyle.boldCyan(s.name) + '"'
         } else {
-          return TermStyle.stdout.boldCyan(s.name) + ' defined in ' +
+          return term.StderrStyle.boldCyan(s.name) + ' defined in ' +
                  s.srcloc.formatFilename('green')
         }
       }).join('\n  ');
@@ -490,7 +567,11 @@ class PkgCompiler {
       return [for (k of Object.keys(a)) if (b[k]) k ];
     };
 
-    let msg = this.log.style.boldGreen(this.pkg.id)+' inter-file dependencies:';
+    let msg = this.log.style.boldGreen(this.pkg.id);
+    if (this.module instanceof TestModule) {
+      msg += '(test)';
+    }
+    msg += ' cross-file dependencies:';
     let filenames = [for (f of srcfiles) if (this._detectedDependencies[f.name]) f.name];
 
     for (let filename of filenames) {
@@ -524,14 +605,15 @@ class PkgCompiler {
         }
       }
     }
-    return msg
+
+    return [msg, filenames]
   }
 
 
   fileDependsOn(fileA, fileB) {
     var dep = this._detectedDependencies[fileA.name];
     if (dep && dep.some(o => o.file === fileB)) {
-      return dep;
+      return dep
     }
   };
 
@@ -541,7 +623,7 @@ class PkgCompiler {
     if (deps) {
       // console.log('fileDependsOnClasses: '+fileA.name+' dependencies:');
       // deps.forEach(dep => {
-      //   console.log('  file.name:                  ' + repr(dep.file.name));
+      //   console.log(' ' + repr(dep.file.name) + ':');
       //   console.log('  binding.identifier.name:    ' + repr(dep.binding.identifier.name,1));
       //   console.log('  binding.kind:               ' + repr(dep.binding.kind,1));
       //   console.log('  binding.isClassDeclaration: ' + repr(dep.binding.isClassDeclaration,1));
@@ -556,127 +638,32 @@ class PkgCompiler {
   };
 
 
-  _resolveFileDeps(fileA, fileB) {
-    // console.log('_resolveFileDeps:', fileA.name, '=>', fileB.name);
-    if (!fileA.unresolvedIDs || !fileB.definedIDs) {
-      return;
+  sortFiles(srcfiles:SrcFile[], depGraph:DAG) { //:SrcFile[]
+    if (srcfiles.length === 1) {
+      return srcfiles;
     }
 
-    let unresolved = Object.keys(fileA.unresolvedIDs);
-    let resolved = unresolved.filter(name =>
-      this._resolveIdentifierAcrossFiles(name, fileA, fileB))
-
-    // Remove any names that were resolved from `fileA.unresolvedIDs`
-    if (resolved.length === unresolved.length) {
-      fileA.unresolvedIDs = null;
-    } else {
-      resolved.forEach(name => { delete fileA.unresolvedIDs[name] })
-    }
-  }
-
-
-  _resolveIdentifierAcrossFiles(name:string, file:SrcFile, otherFile:SrcFile) {
-    let binding = otherFile.definedIDs[name];
-    if (!binding) {
-      return false; // `name` was not resolved
+    // Sort the directed graph of static (level 0) dependencies
+    let L0 = depGraph.sort(this._handleOnCyclicDepError.bind(this));
+    if (srcfiles.length === L0.length) {
+      return L0;
     }
 
-    if (this.log.level >= Logger.DEBUG) {
-      let kind =
-        (file.unresolvedSuperclassIDs && file.unresolvedSuperclassIDs[name]) ? 'class' :
-        (binding.kind === 'hoisted' &&
-         (!binding.node || binding.node.type === 'FunctionDeclaration'))     ? 'function' :
-                                                                             binding.kind;
-      this.log.debug(
-        `resolved reference ${name} in ${file.name} to ${kind} ${name} in ${otherFile.name}`
-      )
-    }
-
-    // `name` refers to a (super)class?
-    let classRef = file.unresolvedSuperclassIDs ? file.unresolvedSuperclassIDs[name] : null;
-    if (classRef) {
-      // Check for inverse class dependency (i.e. cyclic)
-      let classDeps = this.fileDependsOnClasses(otherFile, file);
-      if (classDeps) {
-        throw CyclicRefError(this.pkg, name, file, otherFile, classDeps, /*onlyClasses=*/true);
-      }
-      delete file.unresolvedSuperclassIDs[name];
-    }
-
-    // Register file-to-file dependency
-    let fileDeps = this._detectedDependencies[file.name] ||
-                   (this._detectedDependencies[file.name] = []);
-    fileDeps.push({
-      dependeeFile: file,
-      file:         otherFile,
-      name:         name,
-      binding:      binding,
-      refNode:      file.unresolvedIDs[name].node,
-    });
-
-    if (!file.resolvedIDs) { file.resolvedIDs = {}; }
-    file.resolvedIDs[name] = file.unresolvedIDs[name];
-
-    return true; // `name` was resolved
-  }
-
-
-  // Sorts files in-place based on fileDependsOn(A,B)
-  sortFiles(srcfiles:SrcFile[]) { //:SrcFile[]
-    // console.log('srcfiles (before sorting):', [for (f of srcfiles) f.name])
-
-    // Now sort by dependencies
-    srcfiles = srcfiles.slice();
-    srcfiles.sort((fileA, fileB) => {
-      if (fileA.unresolvedSuperclassIDs || fileB.unresolvedSuperclassIDs) {
-        // Either or both files have class dependencies across other files, so order
-        // based on class hierarchy.
-
-        // Does fileB provide any reference that fileA needs?
-        if (this.fileDependsOnClasses(fileA, fileB)) {
-          return 1; // fileA comes before fileB
-        }
-
-        // Does fileA provide any reference that fileB needs?
-        if (this.fileDependsOnClasses(fileB, fileA)) {
-          return -1; // fileA comes before fileB
-        }
-      }
-
+    // Some source files did not contain level 0 dependencies -- sort by level 1+ dependencies.
+    let Ln = srcfiles.sort((fileA, fileB) => {
       if (this.fileDependsOn(fileA, fileB)) {
         return 1; // fileA comes before fileB
       }
-
       if (this.fileDependsOn(fileB, fileA)) {
         return -1; // fileA comes before fileB
       }
+      return 0; // No difference
+    }).filter(f => L0.indexOf(f) === -1);
 
-      // No difference
-      return 0;
-    });
+    //Ln.forEach(depGraph.add.bind(depGraph));
 
-    // console.log('srcfiles (after sorting):', [for (f of srcfiles) f.name]);
-
-    // Now sort topographically
-    var ts = [];
-    var NONE = {name:'NONE'};
-    for (let fileA of srcfiles) {
-      var deps = this._detectedDependencies[fileA.name];
-      if (deps && deps.length !== 0) {
-        for (let dep of deps) {
-          ts.push([fileA, dep.file]);
-        }
-      } else {
-        ts.push([fileA, NONE]);
-      }
-    }
-    srcfiles = toposort(ts).filter(f => f !== NONE).reverse();
-
-    //console.log('srcfiles (after toposort):', [for (f of srcfiles) f.name]);
-
-    return srcfiles;
+    return Ln.concat(L0);
   }
 
 
 }
-

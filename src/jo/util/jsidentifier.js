@@ -6,8 +6,12 @@ var JSIdentifier = {
     return name.match(RE);
   },
 
-  fromString(s) {
+  fromModuleRef(s) {
     s = s.replace(/^.*[\/\-]([^\/\-]+)$/, '$1').split(/\.+/);
     return s.length === 1 ? s[0] : s[s.length-2];
+  },
+
+  fromString(s) {
+    return String(s).replace(/^[^A-Za-z]+|[^0-9A-Za-z_]/g, '_').replace(/^_+|_+$/g, '');
   },
 }

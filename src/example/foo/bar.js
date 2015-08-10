@@ -1,4 +1,4 @@
-import React, {Component as ReactComponent, X} from 'react'
+import React, {Component as ReactComponent} from 'react'
 // import 'bar/jo-foo.git'  // == import foo from ...
 // import fo, {Foo, Babar, Baz} from './bar'
 // import c, {A, B as Bob} from 'bar/some'
@@ -20,6 +20,7 @@ export var foo = 1, bar;
 // export function exp2() {}
 // export {a, b as Bob}
 
+var funnyName = Bob;
 var FunnyCats = 3;
 var boringCats = 2, FunnyLions = 1;
 

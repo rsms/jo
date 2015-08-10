@@ -14,8 +14,7 @@ var Env = Object.create(null, {
 
   JOROOT: {
     enumerable: true,
-    value: process.env.JOROOT ||
-          (process.env.JOROOT = path.dirname(path.dirname(path.dirname(__dirname))))
+    value: process.env.JOROOT || (process.env.JOROOT = path.dirname(__dirname))
   },
 
   // string[] -- list of search paths, in order.

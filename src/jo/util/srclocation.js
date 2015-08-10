@@ -1,4 +1,4 @@
-// var style = require('./termstyle');
+import 'term'
 
 type SrcLocation = {
   filename:string;
@@ -13,12 +13,14 @@ type SrcLocation = {
 
 function SrcLocation(node:ASTNode, file?:SrcFile) {
   let filename = file ? (file.pkg ? file.pkg.id+'/'+file.name
-                                  : file.relpath)
-                      : null;
+                                  : file.relpath) : null;
   return Object.create(SrcLocation.prototype, {
     filename:    {value: filename, enumerable:true},
     code:        {value: file ? file.code : null, enumerable:true},
-    range:       {value: (node && Array.isArray(node.range)) ? node.range : [0,0], enumerable:true},
+    range:       {
+      value: (node && node.start !== undefined) ? [node.start,node.end] : [0,0],
+      enumerable:true
+    },
     startLine:   {value: (node && node.loc) ? node.loc.start.line : undefined, enumerable:true},
     startColumn: {value: (node && node.loc) ? node.loc.start.column : undefined, enumerable:true},
     endLine:     {value: (node && node.loc) ? node.loc.end.line : undefined, enumerable:true},
@@ -29,7 +31,7 @@ function SrcLocation(node:ASTNode, file?:SrcFile) {
 function SrcLocationWithProps({
   filename, //:string,
   code, //:SrcCodeData,
-  range, //:int[],
+  range, //:int[2],
   startLine, //:int,
   startColumn, //:int,
   endLine, //:int,
@@ -92,7 +94,7 @@ function abbreviateSourceLines(lines, maxlines, startLineno) {
     });
   }
   var endLineno = startLineno + lines.length;
-  var S = TermStyle.stdout;
+  var S = term.StderrStyle;
   var B = Math.ceil(maxlines/2);
   var A = Math.floor(maxlines/2);
   // cut away lines after first+B and before last-A
@@ -113,13 +115,13 @@ function abbreviateSourceLines(lines, maxlines, startLineno) {
 function limitLineLength(line, maxlen, suffix) {
   // ("fooooo",6,"...")  -> "fooooo"
   // ("foooooo",6,"...") -> "foo..."
-  var S = TermStyle.stdout;
+  var S = term.StderrStyle;
   return (line.length <= maxlen) ? line : line.substr(0, maxlen-suffix.length) + S.grey(suffix);
 }
 
 
-SrcLocation.prototype.formatFilename = function(caretColor) {
-  var S = TermStyle.stdout;
+SrcLocation.prototype.formatFilename = function(caretColor='white') {
+  var S = term.StderrStyle;
   var msg = (this.filename ? S.bold(S[caretColor](this.filename)) : '');
   var lc = this.formatLineColumn();
   return (msg !== '') ? (msg + S.grey(':') + lc) : lc;
@@ -128,7 +130,7 @@ SrcLocation.prototype.formatFilename = function(caretColor) {
 
 SrcLocation.prototype.formatLineColumn = function() {
   return (this.startLine !== undefined) ?
-    TermStyle.stdout.grey(
+    term.StderrStyle.grey(
       this.startLine + ((this.startColumn !== undefined) ? ':' + this.startColumn : '')
     )
     : '';
@@ -137,7 +139,7 @@ SrcLocation.prototype.formatLineColumn = function() {
 
 // format(caretColor:string, linesB:int=2, linesA:int=0):string[]
 SrcLocation.prototype.formatCode = function(caretColor='white', linesB=2, linesA=0) {
-  var S = TermStyle.stdout, code = this.code;
+  var S = term.StderrStyle, code = this.code;
   var i, n, start, end;
   var maxLineLen = 100, lineLimitSuffix = '...';
   var lineNoFillz = String(this.endLine+linesA).length;

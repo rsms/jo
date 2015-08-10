@@ -1,23 +1,33 @@
-import sourceMap from 'npmjs.com/source-map'
+import {SourceMapGenerator, SourceMapConsumer} from 'npmjs.com/source-map'
 import path from 'path'
-import {ok as assert} from 'assert'
-import {repr, SrcLocation} from './util'
+import {SrcLocation} from './util'
+import {types as t} from 'npmjs.com/babel-core'
 
 class CodeBuffer {
   constructor(sourceDir:string, target:Target) {
     this.code = '';
+    this.map = new SourceMapGenerator();
     this.line = 0;
     this.column = 0;
-    this.map = new sourceMap.SourceMapGenerator({ file: "out" });
     this.sourceDir = (sourceDir ? sourceDir + '/' : '');
     this.target = target
     this._nextAnonID = 0;
+    this.hasStartedVars = false;
   }
 
 
   get lineStart() {
-    Object.defineProperty(this, 'lineStart', {value:'  , '});
+    Object.defineProperty(this, 'lineStart', {configurable:true, value:'  , '});
+    this.hasStartedVars = true;
     return 'var ';
+  }
+
+
+  resetLineStart() {
+    this.hasStartedVars = false;
+    Object.defineProperty(this, 'lineStart', {configurable:true, get:() => {
+      return CodeBuffer.prototype.lineStart.call(this);
+    }});
   }
 
 
@@ -87,7 +97,7 @@ class CodeBuffer {
 
 
   addMappedCode(code, map) {
-    var consumer = new sourceMap.SourceMapConsumer(map);
+    var consumer = new SourceMapConsumer(map);
 
     for (let i = 0, L = map.sources.length; i !== L; i++) {
       let filename = this.sourceDir + map.sources[i];
@@ -111,23 +121,23 @@ class CodeBuffer {
   }
 
 
-  addRuntimeImports(runtimeImps, isLast:bool) {
-    var runtimeRefs = Object.keys(runtimeImps);
-    for (let i = 0; i !== runtimeRefs.length; i++) {
-      let ref = runtimeRefs[i];
-      let imp = runtimeImps[ref];
-      // assert(imp.specifiers.length === 1)
-      let spec = imp.specifiers[0];
-      if (spec.id.name === 'default') {
-        this.appendLine(
-          this.lineStart + spec.name.name+' = __$irt(' + JSON.stringify(ref) + ')' +
-          ((isLast && i === runtimeRefs.length-1) ? ';' : '')
-        );
-      } else {
-        throw new Error('unexpected runtime helper import: importing member, not default');
-      }
-    }
-  }
+  // addRuntimeImports(runtimeImps, isLast:bool) {
+  //   var runtimeRefs = Object.keys(runtimeImps);
+  //   for (let i = 0; i !== runtimeRefs.length; i++) {
+  //     let ref = runtimeRefs[i];
+  //     let imp = runtimeImps[ref];
+  //     // assert(imp.specifiers.length === 1)
+  //     let spec = imp.specifiers[0];
+  //     if (spec.id.name === 'default') {
+  //       this.appendLine(
+  //         this.lineStart + spec.name.name+' = __$irt(' + JSON.stringify(ref) + ')' +
+  //         ((isLast && i === runtimeRefs.length-1) ? ';' : '')
+  //       );
+  //     } else {
+  //       throw new Error('unexpected runtime helper import: importing member, not default');
+  //     }
+  //   }
+  // }
 
 
   addModuleImports(importRefs) {
@@ -164,10 +174,17 @@ class CodeBuffer {
   _addModuleImportBase(ref:string, imps:Import[], isLastImp:bool) {
     var requireExpr = this.genRequireExpr(ref);
 
+    if (imps.length === 1 && imps[0].specifiers.length === 0) {
+      // Only imported but not actually used. Special case for "testing" but might be used by
+      // other packages.
+      this.appendLine(requireExpr);
+      return [null, null];
+    }
+
     // Is there any default name used for the module?
     for (let imp of imps) {
       for (let spec of imp.specifiers) {
-        if (!spec.imported || spec.imported.name === 'default') {
+        if ((!spec.imported || spec.imported.name === 'default') && spec.local) {
           // Some file imports the module as "default", so let's use that localized id
           let isLast = (isLastImp && imps.length === 1 && imp.specifiers.length === 1);
           let name = this.addImport(imp, requireExpr, spec, isLast);
@@ -185,7 +202,8 @@ class CodeBuffer {
       imps[0].srcfile.name,
       imps[0].source.loc
     );
-    return [defaultIDName, null]
+
+    return [defaultIDName, null];
   }
 
 
@@ -193,7 +211,7 @@ class CodeBuffer {
     // Find remaining imports and specs excluding any spec matching defaultIDName
     imps.forEach(imp => {
       imp.specifiers.forEach(spec => {
-        if (spec.local.name !== defaultIDName) {
+        if (spec.local && spec.local.name !== defaultIDName) {
           names.push(this.addImport(imp, defaultIDName, spec, /*isLast=*/false));
         }
       })
@@ -209,7 +227,8 @@ class CodeBuffer {
     // Find remaining imports and specs excluding any spec matching defaultIDName
     let restImp = []
     imps.forEach(imp => {
-      let specs = [for (spec of imp.specifiers) if (spec.local.name !== defaultIDName) spec];
+      let specs = [ for (spec of imp.specifiers)
+        if (spec.local && spec.local.name !== defaultIDName) spec ];
       if (specs.length !== 0) {
         restImp.push({imp:imp, specs:specs})
       }
@@ -252,11 +271,13 @@ class CodeBuffer {
     }
     //console.log('defaultImp (ref="'+ref+'"):', defaultImp)
 
-    if (isLastImp) {
-      this._addLastModuleImportRest(imps, defaultIDName, names)
-    } else {
-      this._addModuleImportRest(imps, defaultIDName, names)
-    }
+    if (defaultIDName) {
+      if (isLastImp) {
+        this._addLastModuleImportRest(imps, defaultIDName, names)
+      } else {
+        this._addModuleImportRest(imps, defaultIDName, names)
+      }
+    } // else: no symbol (has no refs)
 
     return names;
   }
@@ -268,18 +289,23 @@ class CodeBuffer {
     //    import {x as y} from "foo"
     //           ~~~~~~~~
     // Returns "x" (NOT "y" or "_filename$y")
-    var close = isLast ? ';' : '';
-      // ^ TODO FIXME a cleaner and spearated way to do this
     var srcline;
     var specName = spec.imported ? spec.imported.name : 'default';
 
     if (specName === 'default') {
-      // E.g. `import foo from "foo"`
-      // E.g. `import "foo"`
-      if (!spec.local) {
-        console.log('!spec.local for spec', repr(spec,1))
+      // E.g. `import x from "foo"` -> var x = im("foo")
+      // E.g. `import "foo"`        -> var foo = im("foo")
+      if (spec.local) {
+        srcline = this.lineStart + spec.local.name + ' = ' + moduleCode;
+      } else {
+        // E.g. `import _ from "foo"` -> im("foo")
+        srcline = '';
+        if (this.hasStartedVars) {
+          srcline = ';';
+          this.resetLineStart();
+        }
+        srcline += moduleCode;
       }
-      srcline = this.lineStart + spec.local.name + ' = ' + moduleCode + close;
 
     } else if (spec.type === 'ImportBatchSpecifier') {
       // E.g. `import * as foo from "foo"`
@@ -291,14 +317,17 @@ class CodeBuffer {
         // wrap in `iw`
         moduleCode = '__$iw(' + moduleCode + ')';
       }
-      srcline = this.lineStart + spec.local.name + ' = ' + moduleCode + close;
+      srcline = this.lineStart + spec.local.name + ' = ' + moduleCode;
 
     } else {
       // E.g. `import {x} from "foo"`
       // E.g. `import {x as y} from "foo"`
-      srcline = this.lineStart + spec.local.name+' = '+moduleCode+'.'+spec.imported.name + close;
+      srcline = this.lineStart + spec.local.name+' = '+moduleCode+'.'+spec.imported.name;
     }
 
+    if (isLast) {
+      srcline += ';';
+    }
     this.appendLine(srcline, imp.srcfile.name, imp.loc);
     return specName;
   }
@@ -308,18 +337,25 @@ class CodeBuffer {
     let m;
     if (NPMPkg.refIsNPM(ref)) {
       return '__$i(require('+JSON.stringify(NPMPkg.stripNPMRefPrefix(ref))+'))'
-    } else if (ref[0] === '.' || ref[0] === '/' || this.target.builtInModuleRefs[ref]) {
+    } else if (ref[0] === '/' || this.target.builtInModuleRefs[ref]) {
       return '__$i(require('+JSON.stringify(ref)+'))'
     } else {
+      // if (__DEV__) {
+      //   assert(!ref.startsWith('./'));
+      //   assert(!ref.startsWith('../'));
+      // }
       return '__$im(require,'+JSON.stringify(ref)+')'
     }
   }
 
 
-  appendExport(exp:Export, codegen:Function) {
+  appendExport(exp:Export, codegen:Function, asTest:bool=false) {
     let srcloc = SrcLocation(exp.node, exp.file);
 
     if (exp.name === 'default') {
+      if (asTest) {
+        throw new Error('test '+this.file.name+' trying to "export default"');
+      }
       this.appendLine('exports.__esModule=true;', null, srcloc);
     }
 
@@ -327,30 +363,39 @@ class CodeBuffer {
       // simple path: avoid codegen
       if (exp.name === 'default') {
         this.appendLine('exports["default"]='+exp.node.name+';', null, srcloc);
+      } else if (asTest) {
+        this.appendLine(
+          '__$jotests.set("'+exp.name.replace(/"/,'\\"')+'",'+exp.node.name+');',
+          null,
+          srcloc
+        );
       } else {
         this.appendLine('exports.'+exp.name+'='+exp.node.name+';', null, srcloc);
       }
     } else {
       // value is complex, so we need to codegen from AST
-      let propExpr;
-      if (exp.name === 'default') {
-        propExpr = t.literal(exp.name); // ["default"]
+      let expr;
+      if (asTest) {
+        // __$jotests.set('bar', {...})
+        expr = t.callExpression(
+          t.memberExpression(t.identifier('__$jotests'), t.identifier('set')),
+          [ t.literal(exp.name), exp.node ]
+        );
       } else {
-        propExpr = t.identifier(exp.name); // prop
+        // exports.bar = {...}
+        expr = t.assignmentExpression(
+          '=',
+          t.memberExpression(
+            t.identifier('exports'),
+            (exp.name === 'default') ? t.literal(exp.name) : t.identifier(exp.name),
+            true
+          ),
+          exp.node
+        );
       }
-      // codegen
       let code = codegen(
-        t.program([
-          t.expressionStatement(
-            t.assignmentExpression(
-              '=',
-              t.memberExpression(t.identifier("exports"), propExpr, true),
-              exp.node
-            )
-          )
-        ])
+        t.program([ t.expressionStatement(expr) ])
       );
-      console.log('codegen =>', code);
       this.appendCode(code, srcloc);
     }
   }

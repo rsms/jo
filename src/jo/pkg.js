@@ -12,9 +12,10 @@ class Pkg {
   // jopath?:string;  // e.g. "/jo"
   // files:string;
   // imports:{};      // e.g. {pkgref: [Import], ...}
-  // exports:{};      // e.g. {identifier: Export|null, ...}
-  // module?:IRModule // a compiled module
+  // module?:Module   // a compiled module
+  // testModule?:TestModule // a compiled test module
   // deps:Pkg[]       // packages this package depends on
+  // programs:Program[]
 
   constructor({dir, ref, jopath, files}) {
     this.dir = dir
@@ -22,33 +23,15 @@ class Pkg {
     this.jopath = jopath
     this.files = files
     this.imports = {}
-    this.exports = {}
     this.module = null
+    this.testModule = null
+    this.mainFunc = null
     this.deps = []
-    this.pkgInfo = null
+    this.programs = []
   }
 
-  get id() { 
+  get id() {
     return this.ref || this.dir
-  }
-
-  get hasMainFunc() {
-    return !!this.mainFunc || (this.pkgInfo && this.pkgInfo.main);
-  }
-
-  // parsePkgInfo(code:string):PkgInfo
-  static parsePkgInfo(code) {
-    // find '//#jopkg{"imports":["./bar","react"]}'
-    const jopkgStmtPrefix = '//#jopkg'
-    var end, begin = code.indexOf(jopkgStmtPrefix);
-    if (begin !== -1) {
-      begin += jopkgStmtPrefix.length
-      end = code.indexOf('\n', begin)
-    }
-    if (begin === -1 || end === -1) {
-      throw new Error('missing jopkg statement')
-    }
-    return JSON.parse(code.substring(begin, end))
   }
 
   // async resolveOutputFile(output:string):string
@@ -61,14 +44,17 @@ class Pkg {
     return output
   }
 
-
-  // async loadSrcFiles():SrcFile[]
-  loadSrcFiles() {
-    return Promise.all(this.files.map(async (fn) => {
+  // Creates SrcFile objects and retrieves fs.stat.
+  // Note: Does NOT load the actual file data.
+  // async loadSrcFiles({includeTests:bool}):SrcFile[]
+  loadSrcFiles({includeTests=false}) {
+    var filenames = includeTests ? this.files
+                                 : this.files.filter(fn => !SrcFile.filenameIsTest(fn));
+    return Promise.all(filenames.map(async (fn) => {
       let filename = this.dir + '/' + fn;
-      let st = await fs.stat(filename);
-      let type = path.extname(fn).substr(1).toLowerCase();
-      return /*SrcFile*/{
+      let st       = await fs.stat(filename);
+      let type     = path.extname(fn).substr(1).toLowerCase();
+      return { __proto__:SrcFile.prototype,
         dir:     this.dir,
         name:    fn,
         relpath: fn,
@@ -101,7 +87,7 @@ class Pkg {
     }
 
     let pkg, importError, files = [];
-    
+
     if (ref[0] === '.') {
       // path
       try {
@@ -145,7 +131,7 @@ class Pkg {
   }
 
 
-  static async _envReadRefSrcDir(ref) {
+  static async _envReadRefSrcDir(ref:string) {
     // try {
     return await Env.readdir(ref, 'src')
     // } catch (e) {}
@@ -153,9 +139,8 @@ class Pkg {
   }
 
 
-  // (ref:string)
-  static async fromRef(ref) {
-    let files, pkg
+  static async fromRef(ref:string) {
+    let files, pkg;
     if (ref[0] === '.' || ref[0] === '/') {
       // pathname
       files = (await fs.readdir(ref)).filter(SrcFile.filenameMatches)
@@ -173,8 +158,7 @@ class Pkg {
   }
 
 
-  // (files:string[])
-  static async fromFiles(files) {
+  static async fromFiles(files:string[]) {
     for (let f of files) {
       if (!SrcFile.filenameMatches(f)) {
         throw new Error(`unexpected file type "${f}"`)
@@ -182,6 +166,53 @@ class Pkg {
     }
     let pkgdir = path.dirname(files[0])
     return new Pkg({ref:null, dir:pkgdir, files:files, jopath:null})
+  }
+
+
+  static importsFromModuleInfo(info) {
+    var imports = null;
+    if (info && info.imports) {
+      imports = {};
+      for (let ref of info.imports) {
+        imports[ref] = [] // empty "importedAt" list
+      }
+    }
+    return imports;
+  }
+
+
+  // objects: {string:{nodes:ASTNode[],names:string[]}}
+  // e.g. { react: { nodes: [ [Object] ], names: [ 'default', 'Component', '_bar_js$X' ] }, ... }
+  static mergeImports(base, ...others) {
+    others.forEach(other => {
+      Object.keys(other).forEach(ref => {
+        let otherImp = other[ref];
+        let baseImp = base[ref];
+        if (baseImp) {
+          baseImp.nodes = baseImp.nodes.concat(otherImp.nodes)
+          baseImp.names = baseImp.nodes.concat(otherImp.names)
+        } else {
+          base[ref] = otherImp;
+        }
+      })
+    })
+    return base;
+  }
+
+
+  toJSON() {
+    return {
+      dir:        this.dir,
+      ref:        this.ref,
+      jopath:     this.jopath,
+      files:      this.files,
+      imports:    this.imports,
+      module:     this.module,
+      testModule: this.testModule,
+      mainFunc:   this.mainFunc,
+      deps:       this.deps,
+      programs:   this.programs,
+    };
   }
 
 
@@ -202,6 +233,11 @@ class NPMPkg extends Pkg {
   // isNPM:bool  // true
   constructor(ref) {
     super({ref:ref})
+    this.module = new NPMModule(require.resolve(ref)); // warning: blocking I/O
+  }
+
+  get id() {
+    return npmRefPrefix + this.ref
   }
 }
 
@@ -213,4 +249,3 @@ NPMPkg.refIsNPM = function(ref) {
 NPMPkg.stripNPMRefPrefix = function(ref) {
   return ref.substr(npmRefPrefix.length);
 }
-

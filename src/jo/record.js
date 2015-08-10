@@ -10,11 +10,14 @@ function _$record(name, prototype) {
   var record = function record(properties) {
     var k, v, props = {};
     for (k in properties) {
-      v = props[k];
+      v = properties[k];
       if (v !== undefined) {
-        props[k] = {value:v, enumerable:true, configurable:true};
-      } else if (!(k in prototype)) {
-        throw new Error('unexpected property '+JSON.stringify(k)+' assigned to record '+name);
+        props[k] = {value:v, enumerable:true};
+      }
+      if (__DEV__) {
+        if (!(k in prototype)) {
+          throw new Error('unexpected property '+JSON.stringify(k)+' assigned to record '+name);
+        }
       }
     }
     return Object.create(prototype, props);

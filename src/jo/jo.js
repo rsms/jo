@@ -1,5 +1,4 @@
-import path from 'path'
-import {ParseOpt, SrcError} from './util'
+import {ParseOpt} from './util'
 
 let usage =
 `Jo builds JavaScript programs
@@ -19,14 +18,9 @@ Terminology:
 `
 
 let options = {};
-var Commands = {
-  build:      BuildCmd,
-  remotectrl: RemoteControlCmd,
-  env:        EnvCmd,
-  help:       {argdesc:'<cmd>', desc:'Show help for a command'}
-}
+var Commands = {};
 
-async function Mainv(argv) {
+async function Mainv(argv:string[]) {
   let [prog, argvRest] = ParseOpt.prog(argv)
   let [opts, args, dieusage] = ParseOpt(options, argvRest, usage, prog);
 
@@ -65,7 +59,13 @@ async function Mainv(argv) {
 
 
 function init() {
-  // Add commands to usage
+  Commands = {
+    build:      BuildCmd,
+    test:       TestCmd,
+    remotectrl: RemoteControlCmd,
+    env:        EnvCmd,
+    help:       {argdesc:'<cmd>', desc:'Show help for a command'}
+  };
   let cmds = Object.keys(Commands).map(name =>
     [(Commands[name].argdesc ? name + ' ' + Commands[name].argdesc : name), Commands[name]] )
   let cmdNameMaxLen = cmds.reduce((p, c) => Math.max(p, c[0].length), 0)

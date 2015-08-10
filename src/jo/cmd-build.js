@@ -1,12 +1,12 @@
 import {Unique} from './util'
-import fs from 'asyncfs'
-import path from 'path'
 
-const defaultTarget = TARGET_NODEJS;
+const defaultTarget = 'nodejs';
 
 var BuildCmd = {
 argdesc: '[input]', desc: 'Builds programs and packages',
-usage: `[options] [<package>...]
+
+get usage() { let usage =
+`[options] [<package>...]
 {{prog}} [options] <srcfile>...
 
 Options:
@@ -35,19 +35,33 @@ Options:
 -target <target>
   Specify product target, where <target> can be one of:
 {{targets}}
-`,
+`;
+  let targets = '';
+  for (let targetID in Targets) {
+    let target = Targets[targetID];
+    targets += '    ' + targetID + (targetID === defaultTarget ? ' (default)' : '') + '\n';
+  }
+  let params = {
+    targets: targets,
+    defaultTarget: defaultTarget,
+  };
+  usage = usage.replace(/\{\{([^\}]+)\}\}/g, (verbatim, k) => params[k] ? params[k] : verbatim )
+  return usage;
+},
+
 options: {
   o: '<file>        Output filename',
-  target: '<target> Generate product for "browser", "browser-webkit" or "nodejs" (default)',
+  target: '<target> Generate products for a specific target (defaults to "'+defaultTarget+'")',
   a: '              Force rebuilding of packages that are already up-to-date',
   globals: '<names> Comma separated list of custom global JS identifiers',
   dev: '            Build a development version (unoptimized, debug checks, etc)',
+  dynamic: "        When making a program, load imported modules from disk at runtime rather than creating a statically-linked, self-contained program.",
   v: '              Print status messages',
   D: '              Print debugging messages, useful for developing jo',
   work: '       print the name of the temporary work directory and do not delete it when exiting',
 },
 
-main: async function(opts, args, usage, cb) {
+main: async function(opts, args, usage, cb) { //:Pkg[]
   args = Unique(args.filter(arg => arg.trim()))
 
   if (opts.work) {
@@ -83,6 +97,7 @@ main: async function(opts, args, usage, cb) {
     logger: logger,
     output: opts.o,
     globals: opts.globals ? opts.globals.split(/[\s ]*,[\s ]*/g) : null,
+    staticLinking: !opts.dynamic,
   })
 
   // Target pre-processing
@@ -91,21 +106,31 @@ main: async function(opts, args, usage, cb) {
   }
 
   // Build!
-  let buildCtx = new BuildCtx(target, logger, {forceRebuild:opts.a})
+  let buildCtx = new BuildCtx(target, logger, {
+    forceRebuild: !!opts.a,
+    buildTests: !!opts._testing,
+  });
   await Promise.all(pkgs.map(pkg => buildCtx.buildPkg(pkg)))
 
   // Target post-processing
   if (target.postMake) {
     await target.postMake(pkgs)
   }
-}}
 
-function init() {
+  return pkgs;
+}};
+
+
+function lazyInitUsage() {
   let targets = '';
   for (let targetID in Targets) {
     let target = Targets[targetID];
     targets += '    ' + targetID + (targetID === defaultTarget ? ' (default)' : '') + '\n';
   }
-  let params = { targets: targets };
-  BuildCmd.usage = BuildCmd.usage.replace(/\{\{([^\}]+)\}\}/g, (_, k) => params[k] )
+  let params = {
+    targets: targets,
+    defaultTarget: defaultTarget,
+  };
+  BuildCmd.usage = BuildCmd.usage.replace(/\{\{([^\}]+)\}\}/g, (verbatim, k) =>
+    params[k] ? params[k] : verbatim )
 }

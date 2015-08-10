@@ -148,10 +148,9 @@ class BrowserTarget extends Target {
     var files = [];
     for (let m of this.modules) {
       if (m.pkg.module instanceof PrecompiledModule) {
-        files.push(path.relative(mainPkg.dir, m.pkg.module.file));
+        files.push(path.relative(mainPkg.dir, m.pkg.module.filename));
       } else {
-        //console.log('m.pkg(', m.pkg.id, ').pkgInfo:', m.pkg.pkgInfo);
-        for (let file of m.pkg.pkgInfo.files) {
+        for (let file of m.pkg.module.info.files) {
           files.push(path.relative(mainPkg.dir, m.pkg.dir + '/' + file));
         }
       }
@@ -201,12 +200,12 @@ class BrowserTarget extends Target {
   }
 
 
-  pkgModuleHeader(pkg:Pkg, depLevel:int) {
-    return this._moduleHeader(pkg.ref, pkg.hasMainFunc);
+  pkgModuleHeader(pkg:Pkg, module:Module, depLevel:int) {
+    return this._moduleHeader(pkg.ref, module.hasMainFunc);
   }
 
-  pkgModuleFooter(pkg:Pkg, depLevel:int) {
-    return this._moduleFooter(pkg.hasMainFunc);
+  pkgModuleFooter(pkg:Pkg, module:Module, depLevel:int) {
+    return this._moduleFooter(module.hasMainFunc);
   }
 
   _moduleHeader(ref:string, isMain:bool) {
@@ -278,8 +277,8 @@ class BrowserTarget extends Target {
     for (let m of this.modules) {
       let version = '';
       if (m.pkg.module.stat) {
-        version = '?'+m.pkg.module.stat.mtime.getTime().toString(36);
-      } else if (m.pkg.pkgInfo && m.pkg.pkgInfo.version) {
+        version = '?' + m.pkg.module.stat.mtime.getTime().toString(36);
+      } else if (m.pkg.module.info && m.pkg.module.info.version) {
         version = '?' + m.pkg.pkgInfo.version;
       }
       code += '\n      lm('+JSON.stringify(m.filename + version)+');';
@@ -297,5 +296,5 @@ class BrowserTarget extends Target {
 }
 
 function init() {
-  Targets[TARGET_BROWSER] = BrowserTarget;
+  Targets['browser'] = BrowserTarget;
 }

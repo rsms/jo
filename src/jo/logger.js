@@ -1,4 +1,4 @@
-import {TermStyle} from './util'
+import 'term'
 
 // interface Logger {
 //   debug(arg:any...)
@@ -10,8 +10,8 @@ import {TermStyle} from './util'
 class Logger {
   constructor(level) {
     this.level = level
-    var So = this.style = TermStyle.stdout
-    var Se = this.errstyle = TermStyle.stderr
+    var So = this.style = term.StdoutStyle
+    var Se = this.errstyle = term.StderrStyle
     var werr = function(style, args) {
       process.stderr.write(style.open + 'E ')
       console.error.apply(console, args)
