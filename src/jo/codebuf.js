@@ -194,6 +194,8 @@ class CodeBuffer {
     }
 
     // Nothing imports the module as "default". We use an anonymous ID.
+    // TODO: refactor to use codebuf2 and when !target.isDevMode, don't append lines but
+    //       instead generate more compact code.
     var defaultIDName = this.anonIDName();
     this.appendLine(
       this.lineStart + defaultIDName+' = '+requireExpr,
@@ -336,9 +338,11 @@ class CodeBuffer {
   genRequireExpr(ref) {
     let m;
     if (NPMPkg.refIsNPM(ref)) {
-      return '__$i(require('+JSON.stringify(NPMPkg.stripNPMRefPrefix(ref))+'))'
+      return '__$i(require(_$NPMROOT+' + JSON.stringify(NPMPkg.stripNPMRefPrefix(ref)) + '))'
+
     } else if (ref[0] === '/' || this.target.builtInModuleRefs[ref]) {
       return '__$i(require('+JSON.stringify(ref)+'))'
+
     } else {
       // if (__DEV__) {
       //   assert(!ref.startsWith('./'));

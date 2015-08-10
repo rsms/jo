@@ -106,9 +106,9 @@ class NodeJSProgram {
   JOROOTCode() {
     let code;
     let dstDirAbs = path.dirname(path.resolve(this.filename));
-    let optRelocateable = true; // todo: make into option
+    let configurable = true; // todo: make into option
 
-    if (dstDirAbs.indexOf(Env.JOROOT) === 0) {
+    if (dstDirAbs.startsWith(Env.JOROOT)) {
       if (this.pkg.ref === 'jo/jo') {
         // Note: When building ourselves (local "jo/jo") don't care about env.JOROOT.
         // This allows one jo program to build another jo program, for instance:
@@ -117,7 +117,7 @@ class NodeJSProgram {
         // As "dev-jo" might contain pkgs which are incompatible with /stable-jo/bin/jo,
         // we must ensure that stable-jo loads its packages from /stable-jo/pkg rather
         // than JOROOT/pkg.
-        optRelocateable = false;
+        configurable = false;
       }
       let relpath = path.relative(dstDirAbs, Env.JOROOT);
       if (relpath === '..') {
@@ -130,11 +130,24 @@ class NodeJSProgram {
       code = JSON.stringify(Env.JOROOT);
     }
 
-    if (optRelocateable) {
+    if (configurable) {
       code = 'process.env.JOROOT||' + code;
     }
 
     return code;
+  }
+
+
+  async getNPMROOT() {
+    let basedir = this.pkg.jopath || this.pkg.dir;
+    let dstDir = path.dirname(path.resolve(this.filename));
+    let relpath = path.relative(dstDir, basedir);
+    if (relpath === '..') {
+      return 'require("path").dirname(__dirname)+"/node_modules/"';
+    } else {
+      return 'require("path").resolve(__dirname+' +
+             JSON.stringify('/'+relpath+'/node_modules') + '+"/")';
+    }
   }
 
 
@@ -255,26 +268,27 @@ class NodeJSProgram {
     }
 
     // JOROOT
-    codebuf.append('var _$JOROOT=' + this.JOROOTCode() + ';\n')
+    codebuf.append('var _$JOROOT=' + this.JOROOTCode() + ',' +
+                       '_$NPMROOT=' + (await this.getNPMROOT()) + ';\n');
 
     // Add sourcemap support to nodejs
-    let fn = '/node_modules/source-map-support/source-map-support.js';
-    codebuf.append('try{require(_$JOROOT+' + JSON.stringify(fn) + ').install();}catch(_){}\n');
+    codebuf.append('try{require(_$NPMROOT+"source-map-support/source-map-support.js")'+
+                   '.install();}catch(_){}\n');
 
     // Add core-js
-    let corejsPath = '/node_modules/core-js';
+    let corejsRef = 'core-js/client';
     if (staticLinking) {
       // TODO: Add only what's needed
+      let corejsPath = Env.JOROOT + '/node_modules/' + corejsRef;
       let [corejsCode, corejsMap] = await Promise.all([
-        fs.readFile(Env.JOROOT + corejsPath + '/client/core.min.js', {encoding:'utf8'}),
-        fs.readFile(Env.JOROOT + corejsPath + '/client/core.min.js.map', {encoding:'utf8'}),
+        fs.readFile(corejsPath + '/core.min.js', {encoding:'utf8'}),
+        fs.readFile(corejsPath + '/core.min.js.map', {encoding:'utf8'}),
       ]);
       corejsCode = corejsCode.replace(/\n\/\/#[ \s]*sourceMappingURL=.+\n?/gm, '\n');
       corejsMap = JSON.parse(corejsMap);
       codebuf.appendMapped(corejsCode, corejsMap);
     } else {
-      codebuf.append('require(_$JOROOT+' +
-                     JSON.stringify(corejsPath + '/client/core.js') + ');\n');
+      codebuf.append('require(_$NPMROOT+' + JSON.stringify(corejsRef + '/core.js') + ');\n');
     }
 
     // Add module support
