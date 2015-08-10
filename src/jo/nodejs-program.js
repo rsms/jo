@@ -276,7 +276,7 @@ class NodeJSProgram {
                    '.install();}catch(_){}\n');
 
     // Add core-js
-    let corejsRef = 'core-js/client';
+    let corejsRef = 'babel-core/node_modules/core-js/client';
     if (staticLinking) {
       // TODO: Add only what's needed
       let corejsPath = Env.JOROOT + '/node_modules/' + corejsRef;
