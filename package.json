@@ -1,6 +1,6 @@
 {
   "name": "jo",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "description": "Go-style JavaScript ES6 package compiler",
   "keywords": [
     "es6",
@@ -35,11 +35,9 @@
   "bin": {
     "jo": "bin/jo"
   },
-  "main": "pkg/nodejs.release/jo/index.js",
   "files": [
     "bin/jo",
     "pkg/nodejs.release",
-    "pkg/npm/npmjs.com",
     "src"
   ]
 }
