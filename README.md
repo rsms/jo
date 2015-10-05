@@ -35,7 +35,7 @@ JOROOT="/Users/rasmus/src2/jo"
 
 ## Automatic package-internal vs exported symbols
 
-Like Go, Jo automatically exports symbols that begin with a captial letter:
+Like Go, Jo automatically exports symbols that begin with a capital letter:
 
 foo/info.js
 ```js
